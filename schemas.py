@@ -18,3 +18,8 @@ class UserResponse(BaseModel):
     # 配置ORM模型自动转换Pydantic模型
     class Config:
         from_attributes = True
+
+# 用户登录请求体
+class LoginRequest(BaseModel):
+    username: str  # 用户名，必填
+    password: str  # 密码，必填
