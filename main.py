@@ -1,36 +1,26 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+from database import get_db
+from schemas import UserCreate, UserResponse
+from crud_user import create_user, get_user_by_username
+from security import hash_password 
 
-app = FastAPI()
+app = FastAPI(title = "用户注册接口")
 
-@app.get("/")
-def root():
-    return{"msg":"hello world"}
+# 用户注册接口 - 明文密码版
+@app.post("/register", response_model = UserResponse, summary = "用户注册")
+def register(user: UserCreate, db: Session = Depends(get_db)):
+    # 1、校验用户名是否已存在
+    exist_user = get_user_by_username(db, user.username)
+    if exist_user:
+        # 抛出HTTP异常，返回400状态码和友好提示
+        raise HTTPException(status_code=400, detail="用户名已存在，请更换")
 
-#路径参数接口：{user_id}嵌入URL路径
-@app.get("/user/{user_id}")
-def get_user_info(user_id:int):
-    return {"user_id":user_id,"type":"路径参数"}
+    # 2、密码加密
+    hashed_pwd = hash_password(user.password)
 
-# 查询参数：URL？后拼接，函数内未在路径声明的参数自动识别
-@app.get("/search")
-def search_item(keyword: str,page: int = 1):
-    return{
-        "search_keyword":keyword,
-        "current_page":page ,
-        "type":"查询参数"
-    }
+    # 3、创建用户
+    db_user = create_user(db, user.username, hashed_pwd, user.email)
+    return db_user
 
-# 定义请求数据模型
-class UserCreate(BaseModel):
-    username: str      #必填字符串
-    age: int           # 必填整数
-    email: str | None =None  # 可选邮箱
 
-# POST接口接收JSON请求体
-@app.post("/user/create")
-def create_user(uesr:UserCreate):
-    return {
-        "msg":"用户创建成功",
-        "submit_data" : user.model_dump()
-    }
