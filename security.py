@@ -1,6 +1,11 @@
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
+from database import get_db
+from crud_user import get_user_by_id
 
 # 配置加密上下文，使用bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -44,3 +49,43 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     # 生成并返回JWT令牌
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+# OAuth2令牌提取方案，tokenUrl指定登录接口的路径
+oauth2_scheme = HTTPBearer()
+
+
+def get_current_user(
+        credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
+        db: Session = Depends(get_db)
+):
+    # 从认证凭证中提取 token 字符串
+    token = credentials.credentials
+    """
+    全局鉴权依赖：解析令牌、验证有效性、返回当前登录用户
+    令牌无效/过期/用户不存在时,直接抛出401未授权错误
+    """
+    # 定义统一的401错误
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="无效身份凭证,请重新登陆",
+        headers={"WWW-Authenticate":"Bearer"},
+    )
+
+    try:
+        # 1、解码并验证JWT令牌
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # 2、从载荷中取出用户ID（对应登录时存入的sub字段）
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+    except JWTError:
+        # 令牌篡改、过期、格式错误都会触发该异常
+        raise credentials_exception
+    
+    # 3、根据用户ID查询数据库
+    user = get_user_by_id(db, user_id=int(user_id))
+    if user is None:
+        raise credentials_exception
+
+    # 4、返回完整用户对象，自动注入到接口函数中
+    return user

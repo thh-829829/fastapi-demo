@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from database import get_db
 from schemas import UserCreate, UserResponse, LoginRequest
 from crud_user import create_user, get_user_by_username
-from security import hash_password ,verify_password, create_access_token
-
+from security import hash_password ,verify_password, create_access_token, get_current_user
+from models import User
 
 
 app = FastAPI(title = "用户注册接口")
@@ -44,3 +44,12 @@ def login(user_data: LoginRequest, db: Session = Depends(get_db)):
         "access_token": access_token,
         "token_type": "bearer"
     }
+
+# 添加/users/me 接口：
+@app.get("/users/me", response_model = UserResponse, summary="获取当前登录用户信息(需登录)")
+def get_my_info(current_user: User = Depends(get_current_user)):
+    """
+    受保护接口:必须携带有效JWT才能访问
+    通过鉴权依赖自动拿到当前登录用户,直接返回即可
+    """
+    return current_user
