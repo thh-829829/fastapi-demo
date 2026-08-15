@@ -1,0 +1,27 @@
+你的项目根目录/
+├── app/                  # 应用主包
+│   ├── __init__.py       # 空文件，标识Python包
+│   ├── main.py           # 程序总入口
+│   ├── api/              # 接口层：存放所有路由接口
+│   │   ├── __init__.py
+│   │   └── v1/           # 接口版本，方便后续迭代
+│   │       ├── __init__.py
+│   │       └── user.py
+│   ├── core/             # 核心层：配置、安全工具
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   └── security.py
+│   ├── db/               # 数据库层：连接与会话
+│   │   ├── __init__.py
+│   │   └── database.py
+│   ├── models/           # 模型层：SQLAlchemy ORM模型
+│   │   ├── __init__.py
+│   │   └── user.py
+│   ├── schemas/          # Schema层：Pydantic输入输出模型
+│   │   ├── __init__.py
+│   │   └── user.py
+│   └── services/         # 业务层：CRUD与业务逻辑
+│       ├── __init__.py
+│       └── user_service.py
+├── requirements.txt      # 依赖清单
+└── .gitignore
