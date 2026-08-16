@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 # 下面所有导入全部改为绝对路径（app.xxx 开头）
@@ -31,22 +32,22 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 # 用户登录接口
 @router.post("/login", summary="用户登录, 返回JWT令牌")
-def login(user_data: LoginRequest, db: Session = Depends(get_db)):
+def login(from_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     # 1、根据用户名查询用户
-    db_user = get_user_by_username(db, user_data.username)
+    db_user = get_user_by_username(db, from_data.username)
 
     # 2、校验：用户不存在 或 密码错误，统一返回模糊提示
-    if not db_user or not verify_password(user_data.password, db_user.password):
+    if not db_user or not verify_password(from_data.password, db_user.password):
         raise HTTPException(status_code=400, detail="用户名或密码错误")
 
     # 3、生成JWT令牌
     access_token = create_access_token(data={"sub": str(db_user.id)})
 
-    # 4、返回标准格式
-    return success(
-        data={"access_token": access_token, "token_type": "bearer"},
-        message="登陆成功"
-    )
+    # 4、直接返回标准OAuth2格式，不要套 success()
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 
 # 获取当前登录用户信息接口

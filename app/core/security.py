@@ -21,7 +21,7 @@ def verify_password(plain_password: str,hashed_password: str) -> bool:
 # ==================JWT配置 ========================
 # 密钥：用户令牌签名，生产环境必须保密，本地开发用随机字符串即可
 # 生成方式：终端执行 python -c "import secrets; print(secrets.token_hex(32))"
-SECRET_KEY = "替换为你生成的32位随机密钥字符串"
+SECRET_KEY = "20616995969b5a50d739da6910b6879375f3b85256928a21aa490ea831c4ae76"
 # 签名算法
 ALGORITHM = "HS256"
 # 令牌默认有效期：30分钟
