@@ -4,6 +4,7 @@ from fastapi.exceptions import RequestValidationError
 from app.api.v1.user import router as user_router
 from app.api.v1.goal import router as goal_router
 from app.api.v1.file import router as file_router
+from app.api.v1.task import router as task_router
 from app.core.exception import http_exception_handler, validation_exception_handler,global_exception_handler
 
 
@@ -18,6 +19,10 @@ app.include_router(goal_router, prefix="/api/v1")
 
 # 注册file路由到主应用
 app.include_router(file_router, prefix="/api/v1")
+
+# 注册task路由
+app.include_router(task_router, prefix="/api/v1")
+
 # 注册全局异常处理器
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
