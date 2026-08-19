@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from database import get_db
-from crud_user import get_user_by_id
+from app.db.database import get_db
+from app.services.user_service import get_user_by_id
 
 # 配置加密上下文，使用bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

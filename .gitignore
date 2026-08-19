@@ -1,6 +1,7 @@
 # 虚拟环境
 venv/
 .env
+.env.example
 .venv
 env/
 ENV/
@@ -12,3 +13,6 @@ __pycache__/
 .DS_Store
 *.log
 .idea/
+
+# 本地测试脚本与敏感文件
+test_*.py
