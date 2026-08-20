@@ -50,6 +50,29 @@ class LLMClient:
         except APIError as e:
             raise RuntimeError(f"大模型调用出错：{str(e)}")
 
+    def chat_with_messages(self, messages: list, temperature: float = 0.7) -> str:
+        """
+        支持传入完整消息列表的对话调用
+        :param messages:符合OpenAI格式的消息列表，如[{"role":"system","content":"..."},{""role":"user","content":"..."}]
+        :param temperature: 温度参数
+        :return: 大模型返回的回答文本
+        """
+        client = self._get_client()
+        try:
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature
+            )
+            return response.choices[0].message.content.strip()
+
+        except AuthenticationError:
+            raise RuntimeError("API Key认证失败，请检查DeepSeek密钥是否正确")
+        except APIConnectionError:
+            raise RuntimeError("网络连接失败，无法访问DeepSeek接口")
+        except APIError as e:
+            raise RuntimeError(f"大模型调用出错：{str(e)}")
+
 
 # 全局单例，直接导入使用
 llm_client = LLMClient()

@@ -7,6 +7,7 @@ from app.core.deps import get_current_user
 from app.models.user import User
 from app.services.document_service import get_user_all_documents_content
 from app.utils.llm_client import llm_client
+from app.utils.prompt_templates import build_rag_qa_prompt
 
 router = APIRouter(prefix="/rag", tags=["RAG知识库"])
 
@@ -27,20 +28,12 @@ def ask_question(
     if not doc_content.strip():
         raise HTTPException(status_code=400, detail="当前暂无上传文档，请先上传文档后再提问")
 
-    # 3、拼接Prompt
-    prompt = f"""
-请基于以下参考文档回答用户问题。如果参考文档中没有相关信息，
-请诚实回答"参考文档中未找到相关信息"，不要编造内容。
-
-参考文档：
-{doc_content}
-
-用户问题：{req.question}
-"""
+    # 3、构建结构化Prompt（系统提示词 + 用户问题）
+    messages = build_rag_qa_prompt(doc_content, req.question)
 
     # 4、调用大模型
     try:
-        answer = llm_client.chat(prompt, temperature=0.3)
+        answer = llm_client.chat_with_messages(messages, temperature=0.3)
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=f"大模型调用失败:{str(e)}")
 
