@@ -7,6 +7,9 @@ from app.db.database import get_db
 from app.models.user import User
 from app.models.document import Document
 from app.services.document_parser import parse_document
+from app.utils.text_splitter import split_text_with_overlap
+from app.utils.llm_client import llm_client
+from app.utils.vector_store import vector_store
 
 
 
@@ -44,7 +47,36 @@ def upload_document(
     db.commit()
     db.refresh(db_doc)
 
-   # 4、返回结果
+    # ========== 自动分块+向量化+向量入库 ==========
+    # 1. 文本分块
+    chunks = split_text_with_overlap(db_doc.content, chunk_size=500, chunk_overlap=100)
+
+    # 2. 批量生成向量
+    chunk_texts = [chunk["text"] for chunk in chunks]
+    embeddings = llm_client.get_embeddings(chunk_texts)
+
+    # 3. 构造分块ID与元数据
+    chunk_ids = [f"doc_{db_doc.id}_chunk_{i:04d}" for i in range(len(chunks))]
+    metadatas = [
+        {
+            "document_id": db_doc.id,
+            "document_title": db_doc.filename,
+            "chunk_index": i,
+            **chunk["metadata"]
+        }
+        for i, chunk in enumerate(chunks)
+    ]
+
+    # 4. 批量存入向量库
+    vector_store.add_documents_with_embeddings(
+        collection_name="documents",
+        ids=chunk_ids,
+        documents=chunk_texts,
+        embeddings=embeddings,
+        metadatas=metadatas
+    )
+
+    # 4、返回结果
     return {
         "id": db_doc.id,
         "title": db_doc.filename,

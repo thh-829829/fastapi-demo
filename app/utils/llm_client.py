@@ -1,4 +1,5 @@
 import os
+import requests
 from dotenv import load_dotenv
 from openai import OpenAI, APIError, APIConnectionError, AuthenticationError
 
@@ -12,6 +13,9 @@ class LLMClient:
     def __init__(self):
         self.api_key = os.getenv("DEEPSEEK_API_KEY")
         self.base_url = "https://api.deepseek.com"
+        # 硅基流动 Embedding 配置
+        self.embedding_api_key = os.getenv("SILICONFLOW_API_KEY")
+        self.embedding_base_url = os.getenv("SILICONFLOW_BASE_URL")
         self.model = "deepseek-chat"
         self._client = None
 
@@ -73,6 +77,32 @@ class LLMClient:
         except APIError as e:
             raise RuntimeError(f"大模型调用出错：{str(e)}")
 
+    def get_embeddings(self, texts: list[str], model: str = "BAAI/bge-large-zh-v1.5") -> list[list[float]]:
+        """
+        调用 DeepSeek Embedding接口，批量生成中文文本向量
+        :param texts: 待向量化的文本列表，支持批量传入
+        :param model: Embedding模型名称，默认使用 BGE 中文大模型
+        :return: 向量列表，顺序与输入文本一一对应
+        """
+        url = f"{self.embedding_base_url}/embeddings"
+        headers = {
+            "Authorization": f"Bearer {self.embedding_api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": model,
+            "input": texts
+        }
+
+        response =requests.post(url, headers=headers, json=payload)
+        # 接口异常时主动抛出错误，便于排查
+        response.raise_for_status()
+        data = response.json()
+
+        # 按index 排序，保证返回顺序与输入文本严格一致
+        sorted_data = sorted(data["data"], key=lambda item: item["index"])
+        # 提取纯向量数组
+        return [item["embedding"] for item in sorted_data]
 
 # 全局单例，直接导入使用
 llm_client = LLMClient()

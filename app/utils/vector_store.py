@@ -42,6 +42,30 @@ class VectorStore:
             metadatas=metadatas
         )
 
+    def add_documents_with_embeddings(
+            self,
+            collection_name: str,
+            ids: list[str],
+            documents: list[str],
+            embeddings: list[list[float]],
+            metadatas: list[dict] = None
+    ):
+        """
+        批量插入带自定义向量的文档到向量库
+        :param collection_name: 集合名称
+        :param ids: 文档 ID 列表，顺序与文档一一对应
+        :param documents: 文档文本内容列表
+        :param embeddings:预生成的向量列表，顺序与文档
+        :param metadatas: 元数据列表，可选
+        """
+        collection = self.get_or_create_collection(collection_name)
+        collection.add(
+            ids=ids,
+            documents=documents,
+            embeddings=embeddings,
+            metadatas=metadatas if metadatas else [{} for _ in ids]
+        )
+
     def query_documents(self, collection_name: str, query_text: str, top_k: int = 3):
         """
         相似度搜索：根据查询文本，返回最相关的Top K条文档
@@ -56,6 +80,35 @@ class VectorStore:
             n_results=top_k
         )
         return results
+
+    def query_by_embedding(
+            self,
+            collection_name: str,
+            query_embedding: list[float],
+            top_k: int = 3
+    ) -> list:
+        """
+        使用自定义向量进行相似度检索
+        :param collection_name: 集合名称
+        :param query_embedding: 查询文本的预生成向量
+        :param top_k: 返回最相似的结果数量
+        :return: 检索结果列表，包含文本、元数据、相似度
+        """
+        collection = self.get_or_create_collection(collection_name)
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k
+        )
+        # 格式化返回结果
+        result_list = []
+        for i in range(len(results["ids"][0])):
+            result_list.append({
+                "id": results["ids"][0][i],
+                "text": results["documents"][0][i],
+                "metadata": results["metadatas"][0][i],
+                "distance": results["distances"][0][i]
+            })
+        return result_list
 
     def delete_collection(self, collection_name: str):
         """删除指定集合，用于调试清空数据"""
