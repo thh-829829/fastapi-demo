@@ -29,8 +29,20 @@ def parse_docx_bytes(file_bytes: bytes) -> str:
     except Exception as e:
         raise ValueError(f"Word文件损坏或无法解析: {str(e)}")
 
-    full_text = [p.text for p in doc.paragraphs if p.text.strip()]
-    result = "\n".join(full_text).strip()
+    # 1、提取正文段落
+    paragraph_texts = [p.text for p in doc.paragraphs if p.text.strip()]
+
+    # 2、提取表格内容
+    table_texts = []
+    for table in doc.tables:
+        for row in table.rows:
+            row_cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if row_cells:
+                table_texts.append("|".join(row_cells))
+
+    # 3、合并所有文本
+    all_text = paragraph_texts + table_texts
+    result ="\n".join(all_text).strip()
 
     if not result:
         raise ValueError("Word文件解析结果为空，文档无有效文本内容")

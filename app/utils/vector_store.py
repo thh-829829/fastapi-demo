@@ -27,6 +27,30 @@ class VectorStore:
         )
         return collection
 
+    def search_similar(self,query_vector: list[float], top_n: int = 3) -> list[dict]:
+        """
+        根据查询向量，检索最相似的文档片段
+        :param query_vector: 问题的向量化结果
+        :param top_n: 返回最相关的条数
+        :return: 列表，每个元素包含文本内容、元数据、相似度分数
+        """
+        collection = self.get_or_create_collection()
+
+        #  调用ChromaDB相似度查询
+        results = collection.query(
+            query_embeddings=[query_vector],
+            n_results=top_n,
+            include=["documents", "metadatas", "distances"]
+        )
+
+        # 整理返回格式，方便上层使用
+        result_list = []
+        for doc, meta, distance in zip(results["documents"][0],results["metadatas"][0],results["distances"][0]):
+            result_list.append({"content": doc, "metadata": meta, "distance": distance})
+
+        return result_list
+
+
     def add_documents(self, collection_name: str, ids: list, documents: list, metadatas: list = None):
         """
         批量添加文档到向量库
