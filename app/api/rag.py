@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 import json
+import logging
 
 from app.db.database import get_db
 from app.core.deps import get_current_user
@@ -12,6 +13,9 @@ from app.services.document_service import get_user_all_documents_content
 from app.utils.llm_client import llm_client
 from app.utils.prompt_templates import build_rag_qa_prompt
 from app.utils.vector_store import VectorStore
+
+
+logger = logging.getLogger("rag-api")
 
 router = APIRouter(prefix="/rag", tags=["RAG知识库"])
 
@@ -36,7 +40,8 @@ def ask_question(
 
     # 3、无匹配内容时返回友好提示
     if not related_chunks:
-        raise HTTPException(status_code=400, detail="知识库中未找到相关内容，请先上传文档后再提问")
+        logger.warning("[RAG问答] 知识库未检索到相关内容")
+        raise RuntimeError("知识库中未找到相关内容，请先上传文档后再提问")
 
     # 4、拼接检索到的片段作为参考上下文
     context_parts = []
@@ -58,9 +63,16 @@ def ask_question(
 
     # 6、调用大模型生成回答
     try:
+        logger.info("[RAG问答] 开始调用大模型生成回答")
         answer = llm_client.chat_with_messages(messages, temperature=0.3)
-    except RuntimeError as e:
-        raise HTTPException(status_code=400, detail=f"大模型调用失败：{str(e)}")
+        logger.info("[RAG问答] 大模型回答生成完成")
+    except RuntimeError:
+        # 已经是业务异常，直接透传
+        raise
+    except Exception as e:
+        logger.error(f"[RAG问答] 大模型调用失败：{str(e)}", exc_info=True)
+        raise RuntimeError("大模型调用失败，请稍后重试") from e
+
 
     # 7、返回结果
     return {
@@ -106,20 +118,30 @@ def ask_question_stream(
     messages = build_rag_qa_prompt(doc_content, req.question)
 
     # 6、SSE 流式生成器： 逐字推送内容 + 最后推送来源
-    # 6、SSE 流式生成器：逐字推送内容 + 最后推送来源
     def generate():
-        # 逐字推送回答内容
-        for token in llm_client.stream_chat_with_messages(messages):
-            content_data = json.dumps({'type': 'content', 'data': token}, ensure_ascii=False)
-            yield f"data: {content_data}\n\n"
+        try:
+            # 逐字返回内容
+            for token in llm_client.stream_chat_with_messages(messages):
+                content_data = json.dumps({"type": "content", "data": token}, ensure_ascii=False)
+                yield f"data: {content_data}\n\n"
 
-        # 回答结束后，推送完整引用来源
-        sources_data = json.dumps({'type': 'sources', 'data': sources}, ensure_ascii=False)
-        yield f"data: {sources_data}\n\n"
+            # 回答结束，推送引用来源
+            sources_data = json.dumps({"type": "sources", "data": sources}, ensure_ascii=False)
+            yield f"data: {sources_data}\n\n"
 
-        # 推送结束标记
-        yield "data: [DONE]\n\n"
-
+            # 推送结束标记
+            yield "data: [DONE]\n\n"
+        except RuntimeError as e:
+            # 业务异常，以SSE标准错误事件返回
+            error_data = json.dumps({"type": "error", "code": 400, "message": str(e)}, ensure_ascii=False)
+            yield f"data: {error_data}\n\n"
+            logger.error(f"[RAG流式问答] 业务异常：{str(e)}")
+        except Exception as e:
+            # 未知异常，统一友好提示，不暴露底层错误
+            logger.error(f"[RAG流式问答] 流式生成失败：{str(e)}", exc_info=True)
+            error_data = json.dumps({"type": "error", "code": 500, "message": "流式生成失败，请稍后重试"},
+                                    ensure_ascii=False)
+            yield f"data: {error_data}\n\n"
 
     # 7、返回 SSE 流式响应
     return StreamingResponse(
