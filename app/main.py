@@ -7,7 +7,11 @@ from app.api.v1.file import router as file_router
 from app.api.v1.task import router as task_router
 from app.api.rag import router as rag_router
 from app.core.exception import http_exception_handler, validation_exception_handler,global_exception_handler
+from app.core.exception import runtime_exception_handler
+from app.core.logger import setup_logger
 
+# 项目启动立即初始化日志系统
+setup_logger()
 
 # 创建应用实例，标题改为新项目名
 app = FastAPI(title="AI Agent智能学习助手")
@@ -30,4 +34,5 @@ app.include_router(rag_router, prefix="/app/v1")
 # 注册全局异常处理器
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(RuntimeError, runtime_exception_handler)
 app.add_exception_handler(Exception,global_exception_handler)

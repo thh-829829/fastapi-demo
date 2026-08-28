@@ -3,6 +3,9 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from app.core.response import error 
 
+import logging
+
+logger = logging.getLogger("global-exception")
 
 async def http_exception_handler(request: Request, exc: HTTPException):
     """处理代码主动抛出的HTTP异常"""
@@ -47,6 +50,21 @@ async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content=error(code=500, message="服务器内部错误")
+    )
+
+
+async def runtime_exception_handler(request: Request, exc: RuntimeError):
+    """
+    全局捕获业务运行时异常，统一返回标准错误格式
+    """
+    logger.error(f"业务异常：{str(exc)}")
+    return JSONResponse(
+        status_code=400,
+        content={
+            "code": 400,
+            "message": str(exc),
+            "data": None
+        }
     )
 
 

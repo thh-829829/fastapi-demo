@@ -28,12 +28,7 @@ def upload_document(
     file_bytes = file.file.read()
 
     # 2、调用解析服务自动提取文本
-    try:
-        doc_type, content = parse_document(file_bytes, file.filename)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"文档解析失败: {str(e)}")
+    doc_type, content = parse_document(file_bytes, file.filename)
 
     # 3、解析结果 + 文档信息存入数据库
     db_doc = Document(
@@ -138,3 +133,7 @@ def delete_document(
     }
 
 
+@router.get("/test-error")
+def test_error():
+    """测试全局异常处理器是否生效"""
+    raise RuntimeError("这是测试业务异常")

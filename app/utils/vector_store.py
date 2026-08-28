@@ -1,6 +1,11 @@
 import chromadb
+import logging
+
 from chromadb.config import Settings
 from chromadb.errors import NotFoundError
+
+logger = logging.getLogger("vector_store")
+
 
 class VectorStore:
     def __init__(self, persist_dir: str = "./data/chroma_db"):
@@ -71,7 +76,7 @@ class VectorStore:
             collection_name: str,
             ids: list[str],
             documents: list[str],
-            embeddings: list[list[float]],
+            embeddings: list[list[float | int]],
             metadatas: list[dict] = None
     ):
         """
@@ -79,16 +84,22 @@ class VectorStore:
         :param collection_name: 集合名称
         :param ids: 文档 ID 列表，顺序与文档一一对应
         :param documents: 文档文本内容列表
-        :param embeddings:预生成的向量列表，顺序与文档
+        :param embeddings: 预生成的向量列表，顺序与文档
         :param metadatas: 元数据列表，可选
         """
-        collection = self.get_or_create_collection(collection_name)
-        collection.add(
-            ids=ids,
-            documents=documents,
-            embeddings=embeddings,
-            metadatas=metadatas if metadatas else [{} for _ in ids]
-        )
+        try:
+            logger.info(f"开始向向量库添加文档，集合：{collection_name}，文档块数量：{len(documents)}")
+            collection = self.get_or_create_collection(collection_name)
+            collection.add(
+                ids=ids,
+                documents=documents,
+                embeddings=embeddings,
+                metadatas=metadatas if metadatas else [{} for _ in ids]
+            )
+            logger.info(f"向量库添加文档成功，集合：{collection_name}，文档块数量：{len(documents)}")
+        except Exception as e:
+            logger.error(f"向量库添加文档失败：{str(e)}", exc_info=True)
+            raise RuntimeError("向量存储失败，请稍后重试") from e
 
     def query_documents(self, collection_name: str, query_text: str, top_k: int = 3):
         """
@@ -98,17 +109,24 @@ class VectorStore:
         :param top_k: 返回最相关的条数
         :return: 搜索结果字典，包含文档、距离、元数据
         """
-        collection = self.get_or_create_collection(collection_name)
-        results = collection.query(
-            query_texts=[query_text],
-            n_results=top_k
-        )
-        return results
+        try:
+            logger.info(f"开始向量检索，集合：{collection_name}，查询文本长度：{len(query_text)}，top_k：{top_k}")
+            collection = self.get_or_create_collection(collection_name)
+            results = collection.query(
+                query_texts=[query_text],
+                n_results=top_k
+            )
+            doc_count = len(results.get("documents", [[]])[0])
+            logger.info(f"向量检索完成，集合：{collection_name}，命中文档数量：{doc_count}")
+            return results
+        except Exception as e:
+            logger.error(f"向量检索失败：{str(e)}", exc_info=True)
+            raise RuntimeError("向量检索失败，请稍后重试") from e
 
     def query_by_embedding(
             self,
             collection_name: str,
-            query_embedding: list[float],
+            query_embedding: list[float | int],
             top_k: int = 3
     ) -> list:
         """
@@ -118,21 +136,27 @@ class VectorStore:
         :param top_k: 返回最相似的结果数量
         :return: 检索结果列表，包含文本、元数据、相似度
         """
-        collection = self.get_or_create_collection(collection_name)
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=top_k
-        )
-        # 格式化返回结果
-        result_list = []
-        for i in range(len(results["ids"][0])):
-            result_list.append({
-                "id": results["ids"][0][i],
-                "text": results["documents"][0][i],
-                "metadata": results["metadatas"][0][i],
-                "distance": results["distances"][0][i]
-            })
-        return result_list
+        try:
+            logger.info(f"开始向量检索，集合：{collection_name}，向量维度：{len(query_embedding)}，top_k：{top_k}")
+            collection = self.get_or_create_collection(collection_name)
+            results = collection.query(
+                query_embeddings=[query_embedding],
+                n_results=top_k
+            )
+            # 格式化返回结果
+            result_list = []
+            for i in range(len(results["ids"][0])):
+                result_list.append({
+                    "id": results["ids"][0][i],
+                    "text": results["documents"][0][i],
+                    "metadata": results["metadatas"][0][i],
+                    "distance": results["distances"][0][i]
+                })
+            logger.info(f"向量检索完成，集合：{collection_name}，命中文档数量：{len(result_list)}")
+            return result_list
+        except Exception as e:
+            logger.error(f"向量检索失败：{str(e)}", exc_info=True)
+            raise RuntimeError("向量检索失败，请稍后重试") from e
 
     def delete_collection(self, collection_name: str):
         """删除指定集合，用于调试清空数据"""

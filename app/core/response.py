@@ -16,3 +16,4 @@ def error(code: int = 400, message: str = "操作失败"):
         "message": message,
         "data": None
     }
+
