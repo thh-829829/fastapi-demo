@@ -1,3 +1,4 @@
+import chunk
 import os
 import requests
 from dotenv import load_dotenv
@@ -69,6 +70,34 @@ class LLMClient:
                 temperature=temperature
             )
             return response.choices[0].message.content.strip()
+
+        except AuthenticationError:
+            raise RuntimeError("API Key认证失败，请检查DeepSeek密钥是否正确")
+        except APIConnectionError:
+            raise RuntimeError("网络连接失败，无法访问DeepSeek接口")
+        except APIError as e:
+            raise RuntimeError(f"大模型调用出错：{str(e)}")
+
+    def stream_chat_with_messages(self, messages: list, temperature: float | int = 0.3):
+        """
+        流式调用大模型，逐字返回文本片段
+        :param messages: 符合OpenAI格式的消息列表
+        :param temperature: 温度参数
+        :return: 生成器，逐字yield文本内容
+        """
+        client = self._get_client()
+        try:
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                stream=True  # 仅新增这一行，开启流式响应
+            )
+
+            for chunk in response:
+                content = chunk.choices[0].delta.content
+                if content:
+                    yield content
 
         except AuthenticationError:
             raise RuntimeError("API Key认证失败，请检查DeepSeek密钥是否正确")
