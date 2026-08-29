@@ -5,6 +5,7 @@ from typing import Generator, Dict, Any, List
 from app.utils.llm_client import llm_client
 from app.utils.prompt_templates import build_rag_qa_prompt
 from app.utils.vector_store import vector_store
+from app.utils.redis_client import redis_client
 
 logger = logging.getLogger("rag-service")
 
@@ -16,6 +17,13 @@ def normal_rag_qa(question: str, top_n: int = 8) -> Dict[str, Any]:
     :param top_n: 向量检索返回的相关文档块数量
     :return: 问答结果字典，包含问题、回答、引用来源列表
     """
+    # 0、缓存前置判断：相同问题直接命中返回
+    cache_key = f"rag:qa:{question}"
+    cache_value = redis_client.get(cache_key)
+    if cache_value:
+        logger.info(f"[RAG问答] 缓存命中，问题：{question}")
+        return json.loads(cache_value)
+
     # 1、将用户问题向量化（与入库使用同一模型，保证向量空间一致）
     query_embedding = llm_client.get_embeddings([question])[0]
 
@@ -54,12 +62,19 @@ def normal_rag_qa(question: str, top_n: int = 8) -> Dict[str, Any]:
         logger.error(f"[RAG问答] 大模型调用失败：{str(e)}", exc_info=True)
         raise RuntimeError("大模型调用失败，请稍后重试") from e
 
-    # 7、返回结构化结果
-    return {
+    # 7、组装结果并写入缓存，设置30分钟过期
+    result = {
         "question": question,
         "answer": answer,
         "sources": sources
     }
+    try:
+        redis_client.set(cache_key, json.dumps(result, ensure_ascii=False), expire_seconds=1800)
+        logger.info("[RAG问答] 结果已写入缓存，过期时间30分钟")
+    except Exception as e:
+        logger.warning(f"[RAG问答] 缓存写入失败，不影响主流程：{str(e)}")
+
+    return result
 
 
 def stream_rag_qa(question: str, top_n: int = 8) -> Generator[str, None, None]:
