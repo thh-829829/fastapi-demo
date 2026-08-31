@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
+
 # 导入用户模块的路由对象
 from app.api.v1.user import router as user_router
 from app.api.v1.goal import router as goal_router
@@ -15,6 +17,9 @@ setup_logger()
 
 # 创建应用实例，标题改为新项目名
 app = FastAPI(title="AI Agent智能学习助手")
+
+# 挂载静态文件目录（static在下面根目录，main.py在app目录下，所以用../static）
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # 注册用户路由：统一加 /api/v1 前缀
 app.include_router(user_router, prefix="/api/v1")

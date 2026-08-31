@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG智能知识库</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "微软雅黑", sans-serif;
+        }
+        body {
+            background-color: #f5f7fa;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background-color: #409eff;
+            color: white;
+            padding: 15px 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .main-container {
+            flex: 1;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            overflow: hidden;
+        }
+        /* 左侧上传区 */
+        .upload-panel {
+            width: 300px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .upload-panel h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .file-input {
+            width: 100%;
+        }
+        .upload-btn {
+            width: 100%;
+            padding: 10px;
+            background-color: #409eff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .upload-btn:hover {
+            background-color: #66b1ff;
+        }
+        .upload-result {
+            font-size: 13px;
+            color: #67c23a;
+            word-break: break-all;
+        }
+        .upload-result.error {
+            color: #f56c6c;
+        }
+
+        /* 右侧聊天区 */
+        .chat-panel {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .message {
+            max-width: 70%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        .message.user {
+            align-self: flex-end;
+            background-color: #409eff;
+            color: white;
+        }
+        .message.ai {
+            align-self: flex-start;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        .chat-input-area {
+            padding: 15px;
+            border-top: 1px solid #ebeef5;
+            display: flex;
+            gap: 10px;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            outline: none;
+            font-size: 14px;
+        }
+        .chat-input:focus {
+            border-color: #409eff;
+        }
+        .send-btn {
+            padding: 0 20px;
+            background-color: #409eff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .send-btn:hover {
+            background-color: #66b1ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">RAG 智能知识库助手</div>
+
+    <div class="main-container">
+        <!-- 左侧：文档上传区 -->
+        <div class="upload-panel">
+            <h3>文档上传</h3>
+            <input type="file" class="file-input" id="fileInput" accept=".pdf,.docx,.doc">
+            <button class="upload-btn" id="uploadBtn">上传文档</button>
+            <div class="upload-result" id="uploadResult"></div>
+        </div>
+
+        <!-- 右侧：对话聊天区 -->
+        <div class="chat-panel">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message ai">你好！请先上传文档，然后就可以向我提问了。</div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" class="chat-input" id="questionInput" placeholder="请输入你的问题...">
+                <button class="send-btn" id="sendBtn">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局鉴权Token（联调临时使用，后续做登录功能会动态获取）
+const AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI6MTc4ODEzNzgxNH0.YfSEMaFPisqppXwSFfvZIMyjugfBNtTHLFz934nEGgQ";
+
+                // 文档上传功能
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const uploadResult = document.getElementById('uploadResult');
+
+        uploadBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                uploadResult.textContent = '请先选择文件';
+                uploadResult.className = 'upload-result error';
+                return;
+            }
+
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '上传中...';
+            uploadResult.textContent = '';
+            uploadResult.className = 'upload-result';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/v1/files/upload', {
+                    method: 'POST',
+                    headers:{
+                        'Authorization': 'Bearer ' + AUTH_TOKEN
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    uploadResult.textContent = '上传成功！文档已解析入库';
+                    uploadResult.className = 'upload-result';
+                } else {
+                    uploadResult.textContent = '上传失败：' + (result.message || '未知错误');
+                    uploadResult.className = 'upload-result error';
+                }
+            } catch (error) {
+                uploadResult.textContent = '请求失败：' + error.message;
+                uploadResult.className = 'upload-result error';
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '上传文档';
+            }
+        });
+                // 对话问答功能
+        const chatMessages = document.getElementById('chatMessages');
+        const questionInput = document.getElementById('questionInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        // 向聊天区添加消息
+        function addMessage(content, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = content;
+            chatMessages.appendChild(messageDiv);
+            // 自动滚动到底部
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // 发送问题
+        async function sendQuestion() {
+            const question = questionInput.value.trim();
+            if (!question) return;
+
+            // 添加用户消息
+            addMessage(question, 'user');
+            questionInput.value = '';
+
+            // 按钮禁用
+            sendBtn.disabled = true;
+            sendBtn.textContent = '思考中...';
+
+            try {
+                const response = await fetch('/app/v1/rag/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + AUTH_TOKEN
+                    },
+                    body: JSON.stringify({
+                        question: question
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.code === 200) {
+                    // 后端data字段直接返回回答内容
+                    addMessage(result.data.answer, 'ai');
+                } else {
+                    addMessage('请求失败：' + (result.message || '未知错误'), 'ai');
+                }
+            } catch (error) {
+                addMessage('网络异常：' + error.message, 'ai');
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = '发送';
+            }
+        }
+
+        // 绑定点击和回车发送
+        sendBtn.addEventListener('click', sendQuestion);
+        questionInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                sendQuestion();
+            }
+        });
+
+    </script>
+</body>
+</html>
