@@ -16,7 +16,7 @@ from app.core.logger import setup_logger
 setup_logger()
 
 # 创建应用实例，标题改为新项目名
-app = FastAPI(title="AI Agent智能学习助手")
+app = FastAPI(title="小童AI Agent智能学习助手")
 
 # 挂载静态文件目录（static在下面根目录，main.py在app目录下，所以用../static）
 app.mount("/static", StaticFiles(directory="static"), name="static")

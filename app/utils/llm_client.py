@@ -125,6 +125,38 @@ class LLMClient:
             logger.error(f"[LLM stream] 大模型流式调用出错: {str(e)}", exc_info=True)
             raise RuntimeError(f"大模型调用出错：{str(e)}")
 
+
+    def chat_with_tools(self, messages: list, tools: list, temperature: float | int = 0.7):
+        """
+        支持工具调用的对话
+        :param messages: 消息列表
+        :param tools: 工具定义列表，符合OpenAI Function Calling格式
+        :param temperature: 温度参数
+        :return: 模型响应消息对象，包含内容或 tool_calls
+        """
+        client = self._get_client()
+        try:
+            logger.info(f"[LLM chat_with_tools] 发起工具调用，消息条数：{len(messages)}，工具数量：{len(tools)}")
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                tools=tools,
+                tool_choice="auto",
+                temperature=temperature
+            )
+            logger.info("[LLM chat_with_tools] 调用成功")
+            return response.choices[0].message
+        except AuthenticationError:
+            logger.error("[LLM chat_with_tools] API Key认证失败，请检查DeepSeek密钥是否正确")
+            raise RuntimeError("API Key认证失败，请检查DeepSeek密钥是否正确")
+        except APIConnectionError:
+            logger.error("[LLM chat_with_tools] 网络连接失败，无法访问DeepSeek接口")
+            raise RuntimeError("网络连接失败，无法访问DeepSeek接口")
+        except APIError as e:
+            logger.error(f"[LLM chat_with_tools]大模型调用出错：{str(e)}", exc_info=True)
+            raise RuntimeError(f"大模型调用出错：{str(e)}")
+
+
     def get_embeddings(self, texts: list[str], model: str = "BAAI/bge-large-zh-v1.5") -> list[list[float | int]]:
         """
         调用 Embedding接口，批量生成中文文本向量
