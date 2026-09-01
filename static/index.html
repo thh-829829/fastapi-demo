@@ -70,7 +70,6 @@
         .upload-result.error {
             color: #f56c6c;
         }
-
         /* 右侧聊天区 */
         .chat-panel {
             flex: 1;
@@ -118,6 +117,11 @@
             border-radius: 4px;
             outline: none;
             font-size: 14px;
+            resize: none; /* 禁止手动拉伸 */
+            line-height: 1.5;
+            max-height: 120px; /* 最大高度，超出滚动 */
+            overflow-y: auto;
+            font-family: inherit;
         }
         .chat-input:focus {
             border-color: #409eff;
@@ -133,11 +137,55 @@
         .send-btn:hover {
             background-color: #66b1ff;
         }
+        /* 思考中加载动画 */
+        .thinking-dots {
+            display: inline-flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .thinking-dots span {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: #999;
+            animation: dot-bounce 1.4s infinite ease-in-out both;
+        }
+        .thinking-dots span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+        .thinking-dots span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+        @keyframes dot-bounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+            }
+            40% {
+                transform: scale(1);
+            }
+        }
+        /* ----------新增：文档列表样式 ---------------*/
+        .doc-list-title{
+            font-size: 14px;
+            font-weight:bold;
+            margin-top: 16px;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        #docListBox{
+            font-size: 13px;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+        .doc-item{
+            padding:4px 0;
+            color:#555;
+            border-bottom:1px solid #f2f2f2;
+        }
     </style>
 </head>
 <body>
     <div class="header">RAG 智能知识库助手</div>
-
     <div class="main-container">
         <!-- 左侧：文档上传区 -->
         <div class="upload-panel">
@@ -145,29 +193,35 @@
             <input type="file" class="file-input" id="fileInput" accept=".pdf,.docx,.doc">
             <button class="upload-btn" id="uploadBtn">上传文档</button>
             <div class="upload-result" id="uploadResult"></div>
+            <!-- ==========新增文档列表DOM开始========== -->
+            <div class="doc-list-title">已上传文档</div>
+            <div id="docListBox">
+                <div class="doc-item">暂无文档</div>
+            </div>
+            <!-- ==============新增文档列表结束========== -->
         </div>
-
         <!-- 右侧：对话聊天区 -->
         <div class="chat-panel">
             <div class="chat-messages" id="chatMessages">
                 <div class="message ai">你好！请先上传文档，然后就可以向我提问了。</div>
             </div>
             <div class="chat-input-area">
-                <input type="text" class="chat-input" id="questionInput" placeholder="请输入你的问题...">
+                <textarea class="chat-input" id="questionInput" placeholder="请输入你的问题..." rows="1"></textarea>
                 <button class="send-btn" id="sendBtn">发送</button>
             </div>
         </div>
     </div>
-
     <script>
         // 全局鉴权Token（联调临时使用，后续做登录功能会动态获取）
-const AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI6MTc4ODEzNzgxNH0.YfSEMaFPisqppXwSFfvZIMyjugfBNtTHLFz934nEGgQ";
+        const AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI6MTc4ODIyODUyNH0.gWoV0G6W0fHIbJiusZxobqHOIKdIQVaQUOwi6ybRUVE";
 
-                // 文档上传功能
+        // 当前选中的文档ID， null 表示检索全部文档
+        let selectedDocId = null;
+
+        // 文档上传功能
         const fileInput = document.getElementById('fileInput');
         const uploadBtn = document.getElementById('uploadBtn');
         const uploadResult = document.getElementById('uploadResult');
-
         uploadBtn.addEventListener('click', async () => {
             const file = fileInput.files[0];
             if (!file) {
@@ -175,15 +229,12 @@ const AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI
                 uploadResult.className = 'upload-result error';
                 return;
             }
-
             uploadBtn.disabled = true;
             uploadBtn.textContent = '上传中...';
             uploadResult.textContent = '';
             uploadResult.className = 'upload-result';
-
             const formData = new FormData();
             formData.append('file', file);
-
             try {
                 const response = await fetch('/api/v1/files/upload', {
                     method: 'POST',
@@ -192,12 +243,12 @@ const AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI
                     },
                     body: formData
                 });
-
                 const result = await response.json();
-
                 if (response.ok) {
                     uploadResult.textContent = '上传成功！文档已解析入库';
                     uploadResult.className = 'upload-result';
+                    // 新增：上传成功自动刷新文档列表
+                    loadDocList();
                 } else {
                     uploadResult.textContent = '上传失败：' + (result.message || '未知错误');
                     uploadResult.className = 'upload-result error';
@@ -210,22 +261,131 @@ const AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI
                 uploadBtn.textContent = '上传文档';
             }
         });
-                // 对话问答功能
+
+        // 对话问答功能
         const chatMessages = document.getElementById('chatMessages');
         const questionInput = document.getElementById('questionInput');
         const sendBtn = document.getElementById('sendBtn');
 
         // 向聊天区添加消息
-        function addMessage(content, type) {
+        function addMessage(content, type, skipSave = false) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${type}`;
             messageDiv.textContent = content;
             chatMessages.appendChild(messageDiv);
             // 自动滚动到底部
             chatMessages.scrollTop = chatMessages.scrollHeight;
+            // 保存历史（加载历史时跳过保存，避免重复写入）
+            if (!skipSave) {
+                saveChatHistory();
+            }
         }
 
-        // 发送问题
+        // 保存聊天历史到本地存储
+        function saveChatHistory() {
+            const messages = [];
+            chatMessages.querySelectorAll('.message').forEach(msg => {
+                messages.push({
+                    type: msg.classList.contains('user') ? 'user' : 'ai',
+                    content: msg.textContent
+                });
+            });
+            localStorage.setItem('rag_chat_history', JSON.stringify(messages));
+        }
+
+        // 加载本地聊天历史
+        function loadChatHistory() {
+            const history = localStorage.getItem('rag_chat_history');
+            if (!history) return;
+            try {
+                const messages = JSON.parse(history);
+                // 清空默认欢迎语
+                chatMessages.innerHTML = '';
+                messages.forEach(msg => {
+                    addMessage(msg.content, msg.type, true);
+                });
+            } catch (e) {
+                console.error('加载历史记录失败', e);
+            }
+        }
+
+        // 加载已上传文档列表
+        async function loadDocList() {
+            const docListBox = document.getElementById('docListBox');
+            try {
+                const res = await fetch("/api/v1/files",{
+                    method: "GET",
+                    headers: {
+                        'Authorization': `Bearer ${AUTH_TOKEN}`
+                    }
+                });
+                const result = await res.json();
+                if(res.ok){
+                    const docs = result.list;
+                    if(!docs || docs.length ===0){
+                        docListBox.innerHTML = '<div class="doc-item">暂无文档</div>';
+                        return;
+                    }
+                    let htmlStr = "";
+                    docs.forEach(item=>{
+                        const isSelected = selectedDocId === item.id;
+                        htmlStr += `<div class="doc-item" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: ${isSelected ? '#e8f4ff' : 'transparent'};">
+                            <span class="doc-name" data-id="${item.id}">${item.filename}</span>
+                            <span class="del-btn" data-id="${item.id}" style="color: #f56c6c; cursor: pointer; font-size: 12px;">删除</span>
+                        </div>`;
+                    })
+
+                    docListBox.innerHTML = htmlStr;
+                    // 绑定删除按钮点击事件
+                    docListBox.querySelectorAll('.del-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const id = btn.getAttribute('data-id');
+                            deleteDoc(id);
+                        });
+                    });
+                    // 绑定文档点击选中事件
+                    docListBox.querySelectorAll('.doc-name').forEach(name => {
+                        name.addEventListener('click', (e) =>{
+                            e.stopPropagation();
+                            const id = parseInt(name.getAttribute('data-id'));
+                            // 切换选中状态；再次点击取消选中
+                            selectedDocId = selectedDocId === id ? null : id;
+                            // 重新渲染列表更新高亮
+                            loadDocList();
+                        });
+                    });
+                }else{
+                    docListBox.innerHTML = '<div class="doc-item">获取文档列表失败</div>';
+                }
+            }catch(err){
+                console.error("获取文档列表异常", err);
+                docListBox.innerHTML = '<div class="doc-item">网络异常</div>';
+            }
+        }
+
+        // 删除指定文档
+        async function deleteDoc(docId) {
+            if(!confirm('确定要删除该文档吗？删除后无法恢复')) return;
+            try {
+                const res = await fetch(`/api/v1/files/${docId}`,{
+                    method: "DELETE",
+                    headers: {
+                        'Authorization': `Bearer ${AUTH_TOKEN}`
+                    }
+                });
+                if(res.ok){
+                    // 删除成功自动刷新列表
+                    loadDocList();
+                } else {
+                    alert('删除失败：' + (await res.json()).message);
+                }
+            } catch(err) {
+                alert('删除请求异常：' + err.message);
+            }
+        }
+
+        // 发送问题（流式输出版 + 全类型引用标记彻底清除）
         async function sendQuestion() {
             const question = questionInput.value.trim();
             if (!question) return;
@@ -236,30 +396,93 @@ const AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI
 
             // 按钮禁用
             sendBtn.disabled = true;
-            sendBtn.textContent = '思考中...';
+            sendBtn.textContent = '处理中...';
+
+            // 【修正：先创建元素，再设置内容】
+            const aiMessageDiv = document.createElement('div');
+            aiMessageDiv.className = 'message ai';
+            chatMessages.appendChild(aiMessageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            // 消息框显示思考动画
+            aiMessageDiv.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div>';
 
             try {
-                const response = await fetch('/app/v1/rag/ask', {
+                // 【修正：接口路径从 /app/v1 改为 /api/v1】
+                const response = await fetch('/api/v1/rag/ask/stream', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + AUTH_TOKEN
                     },
                     body: JSON.stringify({
-                        question: question
+                        question: question,
+                        doc_id: selectedDocId
                     })
                 });
 
-                const result = await response.json();
-
-                if (response.ok && result.code === 200) {
-                    // 后端data字段直接返回回答内容
-                    addMessage(result.data.answer, 'ai');
-                } else {
-                    addMessage('请求失败：' + (result.message || '未知错误'), 'ai');
+                if (!response.ok) {
+                    aiMessageDiv.textContent = '请求失败：' + response.statusText;
+                    return;
                 }
+
+                // 读取流式数据
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let fullText = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    // 解码数据片段
+                    const chunk = decoder.decode(value, { stream: true });
+                    // 按SSE协议解析：每段以 data: 开头
+                    const lines = chunk.split('\n\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const content = line.slice(6);
+                            // 跳过流结束标记
+                            if (content === '[DONE]') continue;
+                            try {
+                                // 解析后端返回的JSON，提取真正的回答文本
+                                const chunkObj = JSON.parse(content);
+                                if (chunkObj.type === 'content' && chunkObj.data) {
+                                    // 1. 先把当前片段追加到全文
+                                    fullText += chunkObj.data;
+                                    // 2. 全局清除所有类型引用标记（半角/全角/中文引号、单层/双层）
+                                    fullText = fullText.replace(/[\[［「]{1,2}\s*\d*\s*[\]］」]{1,2}/g, '');
+                                    // 3. 更新页面显示
+                                    aiMessageDiv.textContent = fullText;
+                                    // 自动滚动到底部
+                                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                                }
+                            } catch (e) {
+                                // 解析失败就原样追加，兜底
+                                fullText += content;
+                                fullText = fullText.replace(/[\[［「]{1,2}\s*\d*\s*[\]］」]{1,2}/g, '');
+                                aiMessageDiv.textContent = fullText;
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            }
+                        }
+                    }
+                }
+
+                // 【三步彻底清洗】
+                // 1. 清除所有带数字的引用标记
+                fullText = fullText.replace(/[\[［「]{1,2}\s*\d+\s*[\]］」]{1,2}/g, '');
+                // 2. 清除所有空括号对
+                fullText = fullText.replace(/[\[［「]{1,2}\s*[\]］」]{1,2}/g, '');
+                // 3. 清除所有残留的单个括号字符
+                fullText = fullText.replace(/[\[［「\]］」]/g, '');
+                // 额外清理多余的连续空格，保持文本整洁
+                fullText = fullText.replace(/\s{2,}/g, ' ');
+                aiMessageDiv.textContent = fullText;
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                // 最终保存完整回答到本地历史
+                saveChatHistory();
+
             } catch (error) {
-                addMessage('网络异常：' + error.message, 'ai');
+                aiMessageDiv.textContent = '请求异常：' + error.message;
             } finally {
                 sendBtn.disabled = false;
                 sendBtn.textContent = '发送';
@@ -269,11 +492,26 @@ const AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNiIsImV4cCI
         // 绑定点击和回车发送
         sendBtn.addEventListener('click', sendQuestion);
         questionInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
+            // Enter 发送消息（不按Ctrl时）
+            if (e.key === 'Enter' && !e.ctrlKey) {
+                e.preventDefault();
                 sendQuestion();
+            }
+            // Ctrl+Enter 主动插入换行
+            if (e.key === 'Enter' && e.ctrlKey) {
+                e.preventDefault();
+                const start = questionInput.selectionStart;
+                const end = questionInput.selectionEnd;
+                questionInput.value = questionInput.value.substring(0, start) + '\n' + questionInput.value.substring(end);
+                questionInput.selectionStart = questionInput.selectionEnd = start + 1;
             }
         });
 
+        // 页面加载完毕执行
+        window.onload = function(){
+            loadDocList();
+            loadChatHistory();
+        }
     </script>
 </body>
 </html>

@@ -34,7 +34,7 @@ app.include_router(file_router, prefix="/api/v1")
 app.include_router(task_router, prefix="/api/v1")
 
 # 注册问答路由
-app.include_router(rag_router, prefix="/app/v1")
+app.include_router(rag_router, prefix="/api/v1")
 
 # 注册全局异常处理器
 app.add_exception_handler(HTTPException, http_exception_handler)

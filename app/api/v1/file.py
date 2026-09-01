@@ -103,11 +103,11 @@ def get_my_documents(
             "content_length": len(doc.content),
             "create_time": doc.create_time
         })
-        return {
-            "total": len(result),
-            "list": result,
-            "message": "查询成功"
-        }
+    return {
+        "total": len(result),
+        "list": result,
+        "message": "查询成功"
+    }
 
 
 

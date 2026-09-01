@@ -37,7 +37,7 @@ class VectorStore:
         )
         return collection
 
-    def search_similar(self, query_vector: list[float | int], top_n: int = 3) -> list[dict]:
+    def search_similar(self, query_vector: list[float | int], top_n: int = 3, filter=None) -> list[dict]:
         """
         根据查询向量，检索最相似的文档片段
         :param query_vector: 问题的向量化结果
@@ -52,8 +52,12 @@ class VectorStore:
             results = collection.query(
                 query_embeddings=[query_vector],
                 n_results=top_n,
-                include=["documents", "metadatas", "distances"]
+                include=["documents", "metadatas", "distances"],
+                where=filter
             )
+
+            logger.info(
+                f"[调试] 返回分块元数据样本：{results['metadatas'][0][0] if results['metadatas'] and results['metadatas'][0] else '无数据'}")
 
             # 整理返回格式，方便上层使用
             result_list = []

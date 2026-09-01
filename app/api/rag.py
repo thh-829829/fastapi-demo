@@ -17,7 +17,7 @@ router = APIRouter(prefix="/rag", tags=["RAG知识库"])
 # 请求体模型
 class AskRequest(BaseModel):
     question: str
-
+    doc_id: int | None = None
 
 @router.post(path="/ask", summary="基于文档的问答接口")
 def ask_question(
@@ -29,7 +29,7 @@ def ask_question(
     普通RAG问答接口，一次性返回完整回答
     """
     logger.info(f"[RAG接口] 收到问答请求，用户ID：{current_user.id}")
-    result = normal_rag_qa(req.question, top_n=8)
+    result = normal_rag_qa(req.question, top_n=8, doc_id=req.doc_id)
     return {
         "code": 200,
         "message": "success",
@@ -47,7 +47,7 @@ def ask_question_stream(
     流式RAG问答接口，SSE格式逐字返回回答
     """
     logger.info(f"[RAG接口] 收到流式问答请求，用户ID：{current_user.id}")
-    generator = stream_rag_qa(req.question, top_n=8)
+    generator = stream_rag_qa(req.question, top_n=8, doc_id=req.doc_id)
     return StreamingResponse(
         generator,
         media_type="text/event-stream",
