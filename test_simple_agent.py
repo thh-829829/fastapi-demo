@@ -4,6 +4,7 @@ from app.db.database import get_db
 from app.services import task_service, goal_service
 from app.schemas.task import TaskCreate, TaskUpdate
 from app.models.user import User
+from app.utils.agent_context import AgentContextManager
 
 # ========== 工具定义 ==========
 TOOLS = [
@@ -108,36 +109,58 @@ def execute_tool(tool_name: str, arguments: dict, user_id: int):
     finally:
         db.close()
 
-# ========== 最简Agent核心循环 ==========
-def agent_run(user_input: str, user_id: int = 1, max_steps: int = 5):
-    # 初始化对话上下文，包含系统提示
-    messages = [
-        {
-            "role": "system",
-            "content": "你是一个智能学习助手，可以调用工具帮用户管理任务和目标。"
-                       "如果需要调用工具，请使用function call格式；如果可以直接回答，就直接给出最终回答。"
-                       "调用工具后，你会收到工具执行结果，请根据结果继续处理或给出最终答案。"
-        },
-        {"role": "user", "content": user_input}
-    ]
+# ========== 最简Agent核心循环（带Redis记忆版） ==========
+def agent_run(user_input: str, user_id: int = 1, session_id: str = "default", max_steps: int = 5):
+    # 1. 初始化上下文管理器
+    ctx = AgentContextManager(session_id=session_id, ttl=1800)
+
+    # 2. 新会话自动初始化系统提示
+    if ctx.message_count() == 0:
+        system_prompt = (
+            "你是一个智能学习助手，可以调用工具帮用户管理任务和目标。"
+            "如果需要调用工具，请使用function call格式；如果可以直接回答，就直接给出最终回答。"
+            "调用工具后，你会收到工具执行结果，请根据结果继续处理或给出最终答案。"
+        )
+        ctx.init_session(system_prompt)
+
+    # 3. 追加当前用户输入
+    ctx.add_user_message(user_input)
 
     step = 0
     while step < max_steps:
         step += 1
         print(f"\n--- 第{step}步：思考 ---")
 
+        # 4. 从Redis获取完整历史上下文，传给大模型
+        messages = ctx.get_messages()
+
         # 第1步：思考 - 让LLM判断下一步做什么
         response = llm_client.chat_with_tools(messages, TOOLS)
 
         # 第2步：判断是否需要调用工具
         if not response.tool_calls:
-            # 不需要工具，直接返回最终回答
+            # 不需要工具，保存最终回答并返回
+            ctx.add_assistant_message(content=response.content)
             print("--- 最终回答 ---")
             return response.content
 
         # 第3步：行动 - 执行所有工具调用
         print(f"--- 第{step}步：行动 ---")
-        messages.append(response)  # 把助手的工具调用请求加入上下文
+        # 保存助手的工具调用请求到上下文
+        ctx.add_assistant_message(
+            content=response.content,
+            tool_calls=[
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments
+                    }
+                }
+                for tc in response.tool_calls
+            ]
+        )
 
         for tool_call in response.tool_calls:
             tool_name = tool_call.function.name
@@ -148,22 +171,45 @@ def agent_run(user_input: str, user_id: int = 1, max_steps: int = 5):
             tool_result = execute_tool(tool_name, arguments, user_id)
             print(f"工具结果：{tool_result}")
 
-            # 把观察结果加入上下文，供下一轮思考使用
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "name": tool_name,
-                "content": tool_result
-            })
+            # 保存工具执行结果到上下文
+            ctx.add_tool_message(
+                tool_call_id=tool_call.id,
+                name=tool_name,
+                content=tool_result
+            )
 
     return "执行步数超限，未能完成任务"
 
-# ========== 测试 ==========
+# ========== 多轮对话测试 ==========
 if __name__ == "__main__":
-    print("=" * 50)
-    user_query = "帮我创建一个任务，内容是学习Agent核心原理，优先级中等"
-    print(f"用户提问：{user_query}")
-    print("=" * 50)
+    TEST_SESSION = "test_simple_agent_001"
 
-    answer = agent_run(user_query, user_id=1)
-    print(answer)
+    # ========== 新增：强制清空历史会话，确保干净环境 ==========
+    from app.utils.agent_context import AgentContextManager
+
+    AgentContextManager(session_id=TEST_SESSION).clear()
+    print("已清空历史会话，开始全新测试")
+
+    print("=" * 50)
+    print("【第一轮对话】")
+    user_query1 = "帮我创建一个任务，内容是学习Agent核心原理，优先级中等"
+    print(f"用户提问：{user_query1}")
+    print("=" * 50)
+    answer1 = agent_run(user_query1, user_id=1, session_id=TEST_SESSION)
+    print(answer1)
+
+    print("\n" + "=" * 50)
+    print("【第二轮对话（验证记忆）】")
+    user_query2 = "再帮我查一下我现在一共有多少个待完成任务"
+    print(f"用户提问：{user_query2}")
+    print("=" * 50)
+    answer2 = agent_run(user_query2, user_id=1, session_id=TEST_SESSION)
+    print(answer2)
+
+    print("\n" + "=" * 50)
+    print("【第三轮对话（纯问答，不调用工具）】")
+    user_query3 = "刚才我都做了什么操作？帮我总结一下"
+    print(f"用户提问：{user_query3}")
+    print("=" * 50)
+    answer3 = agent_run(user_query3, user_id=1, session_id=TEST_SESSION)
+    print(answer3)

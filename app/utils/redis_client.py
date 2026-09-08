@@ -70,6 +70,62 @@ class RedisClient:
             logger.error(f"[Redis删除] 失败，key={key}: {str(e)}")
             return False
 
+    def list_append(self, key: str, value: str, expire_seconds: Optional[int] = None) -> int:
+        """
+        向列表尾部追加一个元素，可选设置过期时间
+        :param key: 列表键
+        :param value: 要追加的字符串值
+        :param expire_seconds: 过期时间，单位秒，None表示不设置
+        :return: 追加后列表的长度，失败返回-1
+        """
+        try:
+            length = self.client.rpush(key, value)
+            if expire_seconds is not None:
+                self.client.expire(key, expire_seconds)
+            return length
+        except Exception as e:
+            logger.error(f"[Redis列表追加] 失败，key={key}: {str(e)}")
+            return -1
+
+    def list_get_all(self, key: str) -> list:
+        """
+        获取列表所有元素（按顺序从左到右）
+        :param key: 列表键
+        :return: 元素列表，不存在返回空列表
+        """
+        try:
+            result = self.client.lrange(key, 0, -1)
+            return result if result else []
+        except Exception as e:
+            logger.error(f"[Redis列表读取] 失败，key={key}: {str(e)}")
+            return []
+
+    def list_len(self, key: str) -> int:
+        """
+        获取列表长度
+        :param key: 列表键
+        :return: 列表长度，失败返回0
+        """
+        try:
+            return self.client.llen(key)
+        except Exception as e:
+            logger.error(f"[Redis列表长度] 失败，key={key}: {str(e)}")
+            return 0
+
+    def expire(self, key: str, seconds: int) -> bool:
+        """
+        设置键的过期时间
+        :param key: 键名
+        :param seconds: 过期秒数
+        :return: 是否设置成功
+        """
+        try:
+            return self.client.expire(key, seconds)
+        except Exception as e:
+            logger.error(f"[Redis设置过期] 失败，key={key}: {str(e)}")
+            return False
+
+
 # 全局单例，供业务层直接调用
 redis_client = RedisClient()
 
