@@ -126,6 +126,34 @@ class RedisClient:
             return False
 
 
+    def exists(self, key: str) -> bool:
+        """检查key是否存在"""
+        return self.client.exists(key) > 0
+
+    def hset(self, key: str, field: str, value: str) -> int:
+        """设置哈希字段值"""
+        return self.client.hset(key, field, value)
+
+    def hgetall(self, key: str) -> dict:
+        """获取哈希所有字段"""
+        result = self.client.hgetall(key)
+        return result if result else {}
+
+    def zadd(self, key: str, mapping: dict) -> int:
+        """添加有序集合成员，mapping={member: score}"""
+        return self.client.zadd(key, mapping)
+
+    def zrem(self, key: str, value: str) -> int:
+        """移除有序集合成员"""
+        return self.client.zrem(key, value)
+
+    def zrevrange(self, key: str, start: int, end: int) -> list:
+        """倒序获取有序集合成员（按score从大到小）"""
+        result = self.client.zrevrange(key, start, end)
+        return result if result else []
+
+
+
 # 全局单例，供业务层直接调用
 redis_client = RedisClient()
 

@@ -153,6 +153,29 @@ class AgentService:
     def __init__(self):
         self.max_steps = 10
 
+    def list_sessions(self, user_id: int):
+        """查询用户所有会话列表"""
+        ctx = AgentContextManager(session_id="temp")
+        return ctx.list_user_sessions(user_id)
+
+    def get_session_history(self, user_id: int, session_id: str):
+        """获取指定会话历史，带权限校验"""
+        user_sessions = [s["session_id"] for s in self.list_sessions(user_id)]
+        if session_id not in user_sessions:
+            return None, "会话不存在或无权限访问"
+        ctx = AgentContextManager(session_id=session_id)
+        history = ctx.get_full_history()
+        return history, None
+
+    def delete_session(self, user_id: int, session_id: str):
+        """删除指定会话，带权限校验"""
+        user_sessions = [s["session_id"] for s in self.list_sessions(user_id)]
+        if session_id not in user_sessions:
+            return False, "会话不存在或无权限访问"
+        ctx = AgentContextManager(session_id=session_id)
+        ctx.delete_session(user_id)
+        return True, None
+
     def _execute_tool(self, tool_name: str, arguments: dict, user_id: int) -> str:
         """工具执行器，复用已验证的原生SQL方案"""
         db = next(get_db())
@@ -201,13 +224,13 @@ class AgentService:
         else:
             return "unknown"
 
-    def chat(self, user_id: int, session_id: str = None, message: str = "") -> Tuple[str, str]:
+    def chat(self, user_id: int, session_id: str = None, message: str = "") -> Tuple[str, str, str]:
         """
         统一对话入口
         :param user_id: 用户ID
         :param session_id: 会话ID，None则自动生成
         :param message: 用户消息
-        :return: (session_id, reply_content)
+        :return: (session_id, reply_content, intent_type)
         """
         # 1. 会话ID处理
         if not session_id:
@@ -221,7 +244,7 @@ class AgentService:
             ctx.init_session(SYSTEM_PROMPT)
 
         # 4. 追加用户消息
-        ctx.add_user_message(message)
+        ctx.add_user_message(message, user_id=user_id)
 
         # 5. 核心推理循环
         step = 0
@@ -232,8 +255,9 @@ class AgentService:
 
             # 无需工具调用，返回最终结果
             if not response.tool_calls:
-                ctx.add_assistant_message(content=response.content)
-                return session_id, response.content
+                ctx.add_assistant_message(content=response.content, user_id=user_id)
+                intent_type = self._detect_intent(response.content)
+                return session_id, response.content, intent_type
 
             # 执行工具调用
             ctx.add_assistant_message(
@@ -248,7 +272,8 @@ class AgentService:
                         }
                     }
                     for tc in response.tool_calls
-                ]
+                ],
+                user_id=user_id
             )
 
             for tool_call in response.tool_calls:
@@ -261,7 +286,7 @@ class AgentService:
                     content=tool_result
                 )
 
-        return session_id, "执行步数超限，未能完成处理"
+        return session_id, "执行步数超限，未能完成处理", "unknown"
 
 
 # 单例实例
