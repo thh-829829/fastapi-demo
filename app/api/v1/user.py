@@ -41,7 +41,7 @@ def login(from_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         raise HTTPException(status_code=400, detail="用户名或密码错误")
 
     # 3、生成JWT令牌
-    access_token = create_access_token(data={"sub": str(db_user.id)})
+    access_token = create_access_token(data={"sub": str(db_user.id), "role": db_user.role})
 
     # 4、直接返回标准OAuth2格式，不要套 success()
     return {

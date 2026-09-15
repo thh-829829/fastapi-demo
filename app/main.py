@@ -8,7 +8,9 @@ from app.api.v1.goal import router as goal_router
 from app.api.v1.file import router as file_router
 from app.api.v1.task import router as task_router
 from app.api.v1.agent import router as agent_router
+from app.api.v1.admin import router as admin_router
 from app.api.rag import router as rag_router
+
 from app.core.exception import http_exception_handler, validation_exception_handler,global_exception_handler
 from app.core.exception import runtime_exception_handler
 from app.core.logger import setup_logger
@@ -40,6 +42,8 @@ app.include_router(rag_router, prefix="/api/v1")
 
 # 注册Agent接口
 app.include_router(agent_router, prefix="/api/v1/agent")
+
+app.include_router(admin_router, prefix="/api/v1")
 
 # 注册全局异常处理器
 app.add_exception_handler(HTTPException, http_exception_handler)
