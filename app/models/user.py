@@ -14,6 +14,7 @@ class User(Base):
     password = Column(String(255), nullable=False, comment="用户密码")
     # 邮箱：允许为空
     email = Column(String(100), default=None, comment="邮箱地址")
+    # 角色：普通用户 user / 管理员 admin，老数据迁移后默认 user
+    role = Column(String(20), nullable=False, server_default="user", comment="角色：user/admin")
     # 创建时间：默认当前时间
     create_time = Column(DateTime, default=datetime.now, comment="创建时间")
-    
