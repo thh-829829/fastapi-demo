@@ -6,6 +6,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.services.user_service import get_user_by_id
+from app.models.user import User
+
 
 # 配置加密上下文，使用bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -89,3 +91,13 @@ def get_current_user(
 
     # 4、返回完整用户对象，自动注入到接口函数中
     return user
+
+def require_admin(current_user: User = Depends(get_current_user)):
+    """管理员权限校验依赖：仅 role=admin 可通过，否则 403"""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="权限不足，需要管理员角色"
+        )
+    return current_user
+
