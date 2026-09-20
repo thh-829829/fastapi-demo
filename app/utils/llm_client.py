@@ -18,7 +18,7 @@ class LLMClient:
         # 硅基流动 Embedding 配置
         self.embedding_api_key = os.getenv("SILICONFLOW_API_KEY")
         self.embedding_base_url = os.getenv("SILICONFLOW_BASE_URL")
-        self.model = "deepseek-chat"
+        self.model = "deepseek-v4-flash"
         self._client = None
 
     def _get_client(self) -> OpenAI:

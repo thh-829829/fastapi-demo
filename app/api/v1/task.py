@@ -38,7 +38,7 @@ def get_task(
 ):
     task = task_service.get_task_by_id(db, task_id, current_user.id)
     if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
+        raise HTTPException(status_code=404, detail="任务不存在或无权限访问")
     return task
 
 # 更新任务
@@ -51,7 +51,7 @@ def update_task(
 ):
     task = task_service.update_task(db, task_id, task_in, current_user.id)
     if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
+        raise HTTPException(status_code=404, detail="任务不存在或无权限访问")
     return task
 
 # 删除任务
@@ -63,5 +63,5 @@ def delete_task(
 ):
     result = task_service.delete_task(db, task_id, current_user.id)
     if not result:
-        raise HTTPException(status_code=404, detail="任务不存在")
+        raise HTTPException(status_code=404, detail="任务不存在或无权限访问")
     return {"message": "删除成功"}

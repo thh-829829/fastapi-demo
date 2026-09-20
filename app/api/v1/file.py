@@ -56,6 +56,7 @@ def upload_document(
         {
             "document_id": db_doc.id,
             "document_title": db_doc.filename,
+            "user_id": current_user.id,  # 新增：向量分块绑定所属用户
             "chunk_index": i,
             **chunk["metadata"]
         }
@@ -119,9 +120,9 @@ def delete_document(
     current_user: User = Depends(get_current_user)
 ):
     # 1、查询文档是否存在
-    doc = db.query(Document).filter(Document.id == doc_id).first()
+    doc = db.query(Document).filter(Document.id == doc_id, Document.user_id == current_user.id).first()
     if not doc:
-        raise HTTPException(status_code=404, detail="文档不存在")
+        raise HTTPException(status_code=404, detail="文档不存在或无权限访问")
 
     # 3、删除文档记录
     db.delete(doc)

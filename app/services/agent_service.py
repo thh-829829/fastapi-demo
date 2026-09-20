@@ -235,10 +235,13 @@ class AgentService:
         # 1. 会话ID处理
         if not session_id:
             session_id = f"sess_{uuid.uuid4().hex[:12]}"
-
+        else:
+            # 已有会话：校验归属权，防止越权操作他人会话
+            user_sessions = [s["session_id"] for s in self.list_sessions(user_id)]
+            if session_id not in user_sessions:
+                raise PermissionError("会话不存在或无权限访问")
         # 2. 初始化上下文管理器
         ctx = AgentContextManager(session_id=session_id, ttl=1800)
-
         # 3. 新会话初始化系统提示
         if ctx.message_count() == 0:
             ctx.init_session(SYSTEM_PROMPT)

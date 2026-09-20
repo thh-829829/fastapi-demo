@@ -13,6 +13,7 @@ from app.models.user import User
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(plain_password: str) -> str:
+
     """将明文密码加密为哈希值"""
     return pwd_context.hash(plain_password)
 

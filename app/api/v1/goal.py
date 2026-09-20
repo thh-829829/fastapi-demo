@@ -37,7 +37,7 @@ def get_goal(
 ):
     goal = goal_service.get_goal_by_id(db, goal_id, current_user.id)
     if not goal:
-        raise HTTPException(status_code=404, detail="目标不存在")
+        raise HTTPException(status_code=404, detail="目标不存在或无权限访问")
     return goal
 
 # 更新目标
@@ -50,7 +50,7 @@ def update_goal(
 ):
     goal = goal_service.update_goal(db, goal_id, goal_in, current_user.id)
     if not goal:
-        raise HTTPException(status_code=404, detail="目标不存在")
+        raise HTTPException(status_code=404, detail="目标不存在或无权限访问")
     return goal
 
 # 删除目标
@@ -62,7 +62,7 @@ def delete_goal(
 ):
     result = goal_service.delete_goal(db, goal_id, current_user.id)
     if not result:
-        raise HTTPException(status_code=404,detail="目标不存在")
+        raise HTTPException(status_code=404,detail="目标不存在或无权限访问")
     return {"message": "删除成功"}
 
 

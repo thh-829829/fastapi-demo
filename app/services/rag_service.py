@@ -10,7 +10,7 @@ from app.utils.redis_client import redis_client
 logger = logging.getLogger("rag-service")
 
 
-def normal_rag_qa(question: str, top_n: int = 8, doc_id: int | None = None) -> Dict[str, Any]:
+def normal_rag_qa(question: str, user_id: int, top_n: int = 8, doc_id: int | None = None) -> Dict[str, Any]:
     """
     普通RAG问答：检索相关文档 + 调用大模型生成回答
     :param question: 用户问题文本
@@ -18,7 +18,7 @@ def normal_rag_qa(question: str, top_n: int = 8, doc_id: int | None = None) -> D
     :return: 问答结果字典，包含问题、回答、引用来源列表
     """
     # 0、缓存前置判断：相同问题直接命中返回
-    cache_key = f"rag:qa:{doc_id}:{question}"
+    cache_key = f"rag:qa:{user_id}:{doc_id}:{question}"
     cache_value = redis_client.get(cache_key)
     if cache_value:
         logger.info(f"[RAG问答] 缓存命中，问题：{question}")
@@ -28,8 +28,10 @@ def normal_rag_qa(question: str, top_n: int = 8, doc_id: int | None = None) -> D
     query_embedding = llm_client.get_embeddings([question])[0]
 
     # 2、从向量库检索 TopN 最相关的文档片段
-    # 构造过滤条件；指定文档时只检索该文档的分块
-    filter_condition = {"document_id": doc_id} if doc_id else None
+    # 构造过滤条件：强制按用户隔离 + 可选指定文档
+    filter_condition = {"user_id": user_id}
+    if doc_id:
+        filter_condition["document_id"] = doc_id
     related_chunks = vector_store.search_similar(query_embedding, top_n=top_n, filter= filter_condition)
 
     # 3、无匹配内容时抛出业务异常
@@ -79,7 +81,7 @@ def normal_rag_qa(question: str, top_n: int = 8, doc_id: int | None = None) -> D
     return result
 
 
-def stream_rag_qa(question: str, top_n: int = 8, doc_id: int | None = None) -> Generator[str, None, None]:
+def stream_rag_qa(question: str, user_id: int, top_n: int = 8, doc_id: int | None = None) -> Generator[str, None, None]:
     """
     流式RAG问答：检索相关文档 + SSE逐字输出 + 末尾推送引用来源
     :param question: 用户问题文本
@@ -90,8 +92,10 @@ def stream_rag_qa(question: str, top_n: int = 8, doc_id: int | None = None) -> G
     query_embedding = llm_client.get_embeddings([question])[0]
 
     # 2、从向量库检索 TopN 最相关的文档片段
-    # 构造过滤条件：指定文档时只检索该文档的分块
-    filter_condition = {"document_id": doc_id} if doc_id else None
+    # 构造过滤条件：强制按用户隔离 + 可选指定文档
+    filter_condition = {"user_id": user_id}
+    if doc_id:
+        filter_condition["document_id"] = doc_id
     related_chunks = vector_store.search_similar(query_embedding, top_n=top_n, filter=filter_condition)
 
     # 3、无匹配内容时抛出业务异常
