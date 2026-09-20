@@ -14,6 +14,17 @@ from app.models.user import User
 router = APIRouter(tags=["用户模块"])
 
 
+def _serialize_user(user: User) -> dict:
+    """统一输出用户公开字段，避免密码等敏感信息被序列化返回"""
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role,
+        "create_time": user.create_time
+    }
+
+
 # 用户注册接口 - 把 @app.post 改成 @router.post
 @router.post("/register",  summary="用户注册")
 def register(user: UserCreate, db: Session = Depends(get_db)):
@@ -53,4 +64,9 @@ def login(from_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 # 获取当前登录用户信息接口
 @router.get("/users/me", summary="获取当前登录用户信息(需登录)")
 def get_my_info(current_user: User = Depends(get_current_user)):
-    return success(data=current_user, message="获取用户信息成功")
+    return success(data=_serialize_user(current_user), message="获取用户信息成功")
+
+
+@router.get("/info", summary="获取当前用户信息")
+def get_user_info(current_user: User = Depends(get_current_user)):
+    return success(data=_serialize_user(current_user))

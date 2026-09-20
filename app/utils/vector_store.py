@@ -37,33 +37,50 @@ class VectorStore:
         )
         return collection
 
+    @staticmethod
+    def _build_where_condition(filter_dict: dict) -> dict:
+        """
+        构建符合 ChromaDB 语法的 where 条件
+        单条件直接返回，多条件自动用 $and 包裹
+        """
+        if not filter_dict:
+            return None
+        if len(filter_dict) == 1:
+            return filter_dict
+        return {
+            "$and": [
+                {key: value} for key, value in filter_dict.items()
+            ]
+        }
+
     def search_similar(self, query_vector: list[float | int], top_n: int = 3, filter=None) -> list[dict]:
         """
         根据查询向量，检索最相似的文档片段
         :param query_vector: 问题的向量化结果
         :param top_n: 返回最相关的条数
+        :param filter: 元数据过滤条件字典
         :return: 列表，每个元素包含文本内容、元数据、相似度分数
         """
         try:
             logger.info(f"[向量库检索] 开始相似度检索，top_n={top_n}")
             collection = self.get_or_create_collection()
 
+            # 构建合法的 where 条件
+            where_condition = self._build_where_condition(filter)
+
             # 调用ChromaDB相似度查询
             results = collection.query(
                 query_embeddings=[query_vector],
                 n_results=top_n,
                 include=["documents", "metadatas", "distances"],
-                where=filter
+                where=where_condition
             )
-
             logger.info(
                 f"[调试] 返回分块元数据样本：{results['metadatas'][0][0] if results['metadatas'] and results['metadatas'][0] else '无数据'}")
-
             # 整理返回格式，方便上层使用
             result_list = []
             for doc, meta, distance in zip(results["documents"][0], results["metadatas"][0], results["distances"][0]):
                 result_list.append({"content": doc, "metadata": meta, "distance": distance})
-
             logger.info(f"[向量库检索] 检索完成，命中 {len(result_list)} 条相关文档")
             return result_list
         except Exception as e:
@@ -119,7 +136,7 @@ class VectorStore:
             logger.info(f"[向量库入库] 带向量文档添加成功，集合：{collection_name}，文档块数量：{len(documents)}")
         except Exception as e:
             logger.error(f"[向量库入库] 带向量文档添加失败：{str(e)}", exc_info=True)
-            raise RuntimeError("向量存储失败，请稍后重试") from e
+            raise RuntimeError("向量库存储失败，请稍后重试") from e
 
     def query_documents(self, collection_name: str, query_text: str, top_k: int = 3):
         """
@@ -153,7 +170,7 @@ class VectorStore:
         使用自定义向量进行相似度检索
         :param collection_name: 集合名称
         :param query_embedding: 查询文本的预生成向量
-        :param top_k: 返回最相似的结果数量
+        :param top_k: 返回最相关的结果数量
         :return: 检索结果列表，包含文本、元数据、相似度
         """
         try:
@@ -163,7 +180,6 @@ class VectorStore:
                 query_embeddings=[query_embedding],
                 n_results=top_k
             )
-
             # 格式化返回结果
             result_list = []
             for i in range(len(results["ids"][0])):
@@ -173,12 +189,26 @@ class VectorStore:
                     "metadata": results["metadatas"][0][i],
                     "distance": results["distances"][0][i]
                 })
-
             logger.info(f"[向量库检索] 向量检索完成，集合：{collection_name}，命中文档数量：{len(result_list)}")
             return result_list
         except Exception as e:
             logger.error(f"[向量库检索] 向量检索失败：{str(e)}", exc_info=True)
             raise RuntimeError("向量检索失败，请稍后重试") from e
+
+    def delete_by_metadata(self, filter_dict: dict):
+        """
+        按元数据条件删除对应向量分块
+        单条件直接匹配，多条件自动用 $and 组合，符合 ChromaDB 语法规范
+        :param filter_dict: 元数据过滤条件字典
+        """
+        try:
+            collection = self.get_or_create_collection()
+            where_condition = self._build_where_condition(filter_dict)
+            collection.delete(where=where_condition)
+            logger.info(f"[向量库删除] 按条件删除分块成功，条件：{filter_dict}")
+        except Exception as e:
+            logger.error(f"[向量库删除] 按条件删除失败，条件：{filter_dict}，错误：{str(e)}", exc_info=True)
+            raise RuntimeError("向量分块删除失败，请稍后重试") from e
 
     def delete_collection(self, collection_name: str):
         """删除指定集合，用于调试清空数据"""

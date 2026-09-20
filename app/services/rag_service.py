@@ -134,49 +134,62 @@ def stream_rag_qa(question: str, user_id: int, top_n: int = 8, doc_id: int | Non
     :return: SSE标准格式的字符串生成器，可直接放入StreamingResponse
     """
     start_time = time.time()
-    # 1、将用户问题向量化（与入库使用同一模型，保证向量空间一致）
-    query_embedding = llm_client.get_embeddings([question])[0]
-    # 2、从向量库检索 TopN 最相关的文档片段
-    # 构造过滤条件：强制按用户隔离 + 可选指定文档
-    filter_condition = {"user_id": user_id}
-    if doc_id:
-        filter_condition["document_id"] = doc_id
-    related_chunks = vector_store.search_similar(query_embedding, top_n=top_n, filter=filter_condition)
-    # 3、无匹配内容时抛出业务异常
-    if not related_chunks:
-        logger.warning("[RAG流式问答] 知识库未检索到相关内容")
-        raise RuntimeError("知识库中未找到相关内容，请先上传文档后再提问")
-    # 4、拼接检索到的片段作为参考上下文，组装引用来源
-    context_parts = []
-    sources = []
-    for idx, chunk in enumerate(related_chunks, 1):
-        context_parts.append(f"【参考资料{idx}】\n{chunk['content']}")
-        sources.append({
-            "document_id": chunk["metadata"].get("document_id"),
-            "chunk_index": chunk["metadata"].get("chunk_index"),
-            "content_preview": chunk["content"][:100]
-        })
-    doc_content = "\n\n".join(context_parts)
-    # 5、复用原有 Prompt 模板构建对话消息
-    messages = build_rag_qa_prompt(doc_content, question)
+    try:
+        # 1、将用户问题向量化（与入库使用同一模型，保证向量空间一致）
+        query_embedding = llm_client.get_embeddings([question])[0]
+        # 2、从向量库检索 TopN 最相关的文档片段
+        # 构造过滤条件：强制按用户隔离 + 可选指定文档
+        filter_condition = {"user_id": user_id}
+        if doc_id:
+            filter_condition["document_id"] = doc_id
+        related_chunks = vector_store.search_similar(query_embedding, top_n=top_n, filter=filter_condition)
+        # 3、无匹配内容时抛出业务异常
+        if not related_chunks:
+            logger.warning("[RAG流式问答] 知识库未检索到相关内容")
+            raise RuntimeError("知识库中未找到相关内容，请先上传文档后再提问")
+        # 4、拼接检索到的片段作为参考上下文，组装引用来源
+        context_parts = []
+        sources = []
+        for idx, chunk in enumerate(related_chunks, 1):
+            context_parts.append(f"【参考资料{idx}】\n{chunk['content']}")
+            sources.append({
+                "document_id": chunk["metadata"].get("document_id"),
+                "chunk_index": chunk["metadata"].get("chunk_index"),
+                "content_preview": chunk["content"][:100]
+            })
+        doc_content = "\n\n".join(context_parts)
+        # 5、复用原有 Prompt 模板构建对话消息
+        messages = build_rag_qa_prompt(doc_content, question)
+    except Exception as e:
+        # 检索或向量化阶段失败时也要记录日志，避免流式请求漏记
+        latency = int((time.time() - start_time) * 1000)
+        create_qa_log(
+            user_id=user_id,
+            question=question,
+            answer_summary="",
+            latency_ms=latency,
+            hit_knowledge=False,
+            status="failed",
+            error_msg=str(e)
+        )
+        raise
+
     # 6、SSE 流式生成器：逐字推送内容 + 最后推送来源 + 结束标记
     def generate():
+        answer_parts = []
         try:
             # 逐字返回回答内容
             for token in llm_client.stream_chat_with_messages(messages):
+                answer_parts.append(token)
                 content_data = json.dumps({"type": "content", "data": token}, ensure_ascii=False)
                 yield f"data: {content_data}\n\n"
             # 回答结束，推送引用来源
             sources_data = json.dumps({"type": "sources", "data": sources}, ensure_ascii=False)
             yield f"data: {sources_data}\n\n"
 
-            # 推送结束标记
-            yield "data: [DONE]\n\n"
-            logger.info("[RAG流式问答] 流式生成完成")
-
-            # 流式输出完成后写入成功日志
+            # 在推送结束标记前写入成功日志，避免客户端提前断开导致漏记
             latency = int((time.time() - start_time) * 1000)
-            answer_summary = sources[0]["content_preview"] if sources else ""
+            answer_summary = "".join(answer_parts)[:100]
             hit_knowledge = len(related_chunks) > 0
             create_qa_log(
                 user_id=user_id,
@@ -186,6 +199,10 @@ def stream_rag_qa(question: str, user_id: int, top_n: int = 8, doc_id: int | Non
                 hit_knowledge=hit_knowledge,
                 status="success"
             )
+            logger.info("[RAG流式问答] 流式生成完成")
+
+            # 推送结束标记
+            yield "data: [DONE]\n\n"
 
         except RuntimeError as e:
             # 业务异常：以SSE标准错误事件返回
@@ -198,7 +215,7 @@ def stream_rag_qa(question: str, user_id: int, top_n: int = 8, doc_id: int | Non
             create_qa_log(
                 user_id=user_id,
                 question=question,
-                answer_summary="",
+                answer_summary="".join(answer_parts)[:100],
                 latency_ms=latency,
                 hit_knowledge=False,
                 status="failed",
@@ -210,4 +227,15 @@ def stream_rag_qa(question: str, user_id: int, top_n: int = 8, doc_id: int | Non
             logger.error(f"[RAG流式问答] 流式生成失败：{str(e)}", exc_info=True)
             error_data = json.dumps({"type": "error", "code": 500, "message": "流式生成失败，请稍后重试"}, ensure_ascii=False)
             yield f"data: {error_data}\n\n"
+
+            latency = int((time.time() - start_time) * 1000)
+            create_qa_log(
+                user_id=user_id,
+                question=question,
+                answer_summary="".join(answer_parts)[:100],
+                latency_ms=latency,
+                hit_knowledge=False,
+                status="failed",
+                error_msg=str(e)
+            )
     return generate()
