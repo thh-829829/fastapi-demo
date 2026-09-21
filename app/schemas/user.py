@@ -1,6 +1,6 @@
 # 专门存放接口的输入输出模型
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 from typing import Optional
 
 # 用户注册请求体模型
@@ -16,8 +16,7 @@ class UserResponse(BaseModel):
     email: Optional[str] = None
 
     # 配置ORM模型自动转换Pydantic模型
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # 用户登录请求体
 class LoginRequest(BaseModel):

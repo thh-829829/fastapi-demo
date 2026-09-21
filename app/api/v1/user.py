@@ -38,8 +38,8 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
     # 3、创建用户
     db_user = create_user(db, user.username, hashed_pwd, user.email)
-    # 用统一格式返回
-    return success(data=db_user, message="注册成功")
+    # 只返回公开字段，避免密码哈希被序列化
+    return success(data=_serialize_user(db_user), message="注册成功")
 
 # 用户登录接口
 @router.post("/login", summary="用户登录, 返回JWT令牌")

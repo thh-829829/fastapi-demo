@@ -12,23 +12,42 @@ class RedisClient:
 
     def __init__(self, host: str = "127.0.0.1", port: int = 6379, db: int = 0):
         """
-        初始化Redis连接
+        初始化Redis连接参数。
+
+        这里不在导入阶段主动连接Redis，避免单元测试或仅使用非缓存接口时
+        因为Redis未启动而阻塞应用导入。第一次真正操作Redis时再建立连接。
         :param host: Redis服务地址
         :param port: Redis服务端口
         :param db: 数据库编号
         """
-        try:
-            self.client = redis.Redis(
-                host=host, port=port, db=db,
-                decode_responses=True, # 自动解码为字符串，不用手动转 bytes
-                socket_connect_timeout=3
-            )
-            # 测试链连接
-            self.client.ping()
-            logger.info("[Redis初始化] 连接成功")
-        except Exception as e:
-            logger.error(f"[Redis初始化] 连接失败：{str(e)}", exc_info=True)
-            raise RuntimeError("Redis连接失败，请检查服务是否启动") from e
+        self.host = host
+        self.port = port
+        self.db = db
+        self._client = None
+
+    @property
+    def client(self):
+        """兼容原有调用方式，按需返回已连接的Redis客户端。"""
+        return self._get_client()
+
+    def _get_client(self):
+        """懒加载Redis客户端，首次使用时验证连接是否可用。"""
+        if self._client is None:
+            try:
+                client = redis.Redis(
+                    host=self.host,
+                    port=self.port,
+                    db=self.db,
+                    decode_responses=True,
+                    socket_connect_timeout=3
+                )
+                client.ping()
+                self._client = client
+                logger.info("[Redis初始化] 连接成功")
+            except Exception as e:
+                logger.error(f"[Redis初始化] 连接失败：{str(e)}", exc_info=True)
+                raise RuntimeError("Redis连接失败，请检查服务是否启动") from e
+        return self._client
 
     def set(self, key: str, value: str, expire_seconds: Optional[int] = None) -> bool:
         """
@@ -39,7 +58,7 @@ class RedisClient:
         :return: 是否设置成功
         """
         try:
-            self.client.set(key, value, ex=expire_seconds)
+            self._get_client().set(key, value, ex=expire_seconds)
             return True
         except Exception as e:
             logger.error(f"[Redis写入] 失败，key={key}: {str(e)}")
@@ -52,7 +71,7 @@ class RedisClient:
         :return: 缓存值，不存在返回None
         """
         try:
-            return self.client.get(key)
+            return self._get_client().get(key)
         except Exception as e:
             logger.error(f"[Redis读取] 失败，key={key}: {str(e)}")
             return None
@@ -64,7 +83,7 @@ class RedisClient:
         :return: 是否删除成功
         """
         try:
-            self.client.delete(key)
+            self._get_client().delete(key)
             return True
         except Exception as e:
             logger.error(f"[Redis删除] 失败，key={key}: {str(e)}")
@@ -79,9 +98,10 @@ class RedisClient:
         :return: 追加后列表的长度，失败返回-1
         """
         try:
-            length = self.client.rpush(key, value)
+            client = self._get_client()
+            length = client.rpush(key, value)
             if expire_seconds is not None:
-                self.client.expire(key, expire_seconds)
+                client.expire(key, expire_seconds)
             return length
         except Exception as e:
             logger.error(f"[Redis列表追加] 失败，key={key}: {str(e)}")
@@ -94,7 +114,7 @@ class RedisClient:
         :return: 元素列表，不存在返回空列表
         """
         try:
-            result = self.client.lrange(key, 0, -1)
+            result = self._get_client().lrange(key, 0, -1)
             return result if result else []
         except Exception as e:
             logger.error(f"[Redis列表读取] 失败，key={key}: {str(e)}")
@@ -107,7 +127,7 @@ class RedisClient:
         :return: 列表长度，失败返回0
         """
         try:
-            return self.client.llen(key)
+            return self._get_client().llen(key)
         except Exception as e:
             logger.error(f"[Redis列表长度] 失败，key={key}: {str(e)}")
             return 0
@@ -120,7 +140,7 @@ class RedisClient:
         :return: 是否设置成功
         """
         try:
-            return self.client.expire(key, seconds)
+            return self._get_client().expire(key, seconds)
         except Exception as e:
             logger.error(f"[Redis设置过期] 失败，key={key}: {str(e)}")
             return False
@@ -128,28 +148,28 @@ class RedisClient:
 
     def exists(self, key: str) -> bool:
         """检查key是否存在"""
-        return self.client.exists(key) > 0
+        return self._get_client().exists(key) > 0
 
     def hset(self, key: str, field: str, value: str) -> int:
         """设置哈希字段值"""
-        return self.client.hset(key, field, value)
+        return self._get_client().hset(key, field, value)
 
     def hgetall(self, key: str) -> dict:
         """获取哈希所有字段"""
-        result = self.client.hgetall(key)
+        result = self._get_client().hgetall(key)
         return result if result else {}
 
     def zadd(self, key: str, mapping: dict) -> int:
         """添加有序集合成员，mapping={member: score}"""
-        return self.client.zadd(key, mapping)
+        return self._get_client().zadd(key, mapping)
 
     def zrem(self, key: str, value: str) -> int:
         """移除有序集合成员"""
-        return self.client.zrem(key, value)
+        return self._get_client().zrem(key, value)
 
     def zrevrange(self, key: str, start: int, end: int) -> list:
         """倒序获取有序集合成员（按score从大到小）"""
-        result = self.client.zrevrange(key, start, end)
+        result = self._get_client().zrevrange(key, start, end)
         return result if result else []
 
 

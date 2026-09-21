@@ -48,8 +48,9 @@ def create_qa_log(
     :param error_msg: 失败时的错误信息
     :return: 是否写入成功，失败只打日志不抛出异常
     """
-    db = SessionLocal()
+    db = None
     try:
+        db = SessionLocal()
         # 基础脱敏与截断：避免过长内容和敏感信息入库
         clean_question = _sanitize_text(question, 500) or ""
         clean_summary = _sanitize_text(answer_summary, 300) or ""
@@ -69,10 +70,12 @@ def create_qa_log(
         return True
     except Exception as e:
         logger.error(f"[问答日志写入失败] user_id={user_id}, error={str(e)}")
-        db.rollback()
+        if db is not None:
+            db.rollback()
         return False
     finally:
-        db.close()
+        if db is not None:
+            db.close()
 
 
 def list_qa_logs_admin(

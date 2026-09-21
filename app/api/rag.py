@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.db.database import get_db
 from app.core.deps import get_current_user
@@ -16,8 +16,8 @@ router = APIRouter(prefix="/rag", tags=["RAG知识库"])
 
 # 请求体模型
 class AskRequest(BaseModel):
-    question: str
-    doc_id: int | None = None
+    question: str = Field(..., min_length=1, max_length=2000, description="用户问题")
+    doc_id: int | None = Field(None, ge=1, description="指定文档ID，可选")
 
 @router.post(path="/ask", summary="基于文档的问答接口")
 def ask_question(
