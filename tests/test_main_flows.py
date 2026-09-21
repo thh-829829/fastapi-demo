@@ -132,6 +132,7 @@ def test_document_upload_and_delete_flow(
 def test_rag_qa_flow(client, seeded_users, auth_headers, monkeypatch):
     headers = auth_headers(seeded_users["user_a"])
     logged_events = []
+    captured_filters = []
 
     monkeypatch.setattr(rag_service.redis_client, "get", lambda key: None)
     monkeypatch.setattr(
@@ -147,17 +148,19 @@ def test_rag_qa_flow(client, seeded_users, auth_headers, monkeypatch):
     monkeypatch.setattr(
         rag_service.vector_store,
         "search_similar",
-        lambda query_vector, top_n, filter: [
-            {
-                "content": "FastAPI 使用 Depends 完成依赖注入。",
-                "metadata": {
-                    "document_id": 10,
-                    "user_id": seeded_users["user_a"]["id"],
-                    "chunk_index": 0,
-                },
-                "distance": 0.1,
-            }
-        ],
+        lambda query_vector, top_n, filter: (
+            captured_filters.append(filter) or [
+                {
+                    "content": "FastAPI 使用 Depends 完成依赖注入。",
+                    "metadata": {
+                        "document_id": 10,
+                        "user_id": seeded_users["user_a"]["id"],
+                        "chunk_index": 0,
+                    },
+                    "distance": 0.1,
+                }
+            ]
+        ),
     )
     monkeypatch.setattr(
         rag_service.llm_client,
@@ -181,6 +184,7 @@ def test_rag_qa_flow(client, seeded_users, auth_headers, monkeypatch):
     assert data["sources"][0]["document_id"] == 10
     assert logged_events
     assert logged_events[0]["user_id"] == seeded_users["user_a"]["id"]
+    assert captured_filters == [{"user_id": seeded_users["user_a"]["id"]}]
 
 
 def test_agent_chat_flow(client, seeded_users, auth_headers, monkeypatch):
@@ -202,7 +206,6 @@ def test_agent_chat_flow(client, seeded_users, auth_headers, monkeypatch):
     response = client.post(
         "/api/v1/agent/chat",
         json={
-            "user_id": 999,
             "session_id": "sess_test_123",
             "message": "帮我制定一周学习计划",
         },
@@ -212,3 +215,10 @@ def test_agent_chat_flow(client, seeded_users, auth_headers, monkeypatch):
     assert response.json()["data"]["session_id"] == "sess_test_123"
     assert captured["user_id"] == seeded_users["user_a"]["id"]
     assert captured["session_id"] == "sess_test_123"
+
+
+def test_frontend_exposes_agent_mode(client):
+    response = client.get("/static/index.html")
+    assert response.status_code == 200
+    assert "学习管家" in response.text
+    assert "/api/v1/agent/chat" in response.text

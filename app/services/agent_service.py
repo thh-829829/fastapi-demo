@@ -1,11 +1,21 @@
 import json
 import uuid
+import logging
+from datetime import datetime
 from typing import Tuple
+
+from fastapi import HTTPException
 from sqlalchemy import text
+
 from app.utils.llm_client import llm_client
 from app.utils.agent_context import AgentContextManager
 from app.db.database import get_db
-from app.services import task_service
+from app.services import goal_service, rag_service, task_service
+from app.schemas.goal import GoalCreate
+from app.schemas.task import TaskCreate
+
+
+logger = logging.getLogger("agent-service")
 
 # ========== 工具定义（与测试脚本保持一致） ==========
 TOOLS = [
@@ -47,6 +57,94 @@ TOOLS = [
                 "required": []
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_goal",
+            "description": "为当前用户创建学习目标，用于承载后续拆解出的阶段任务或每日任务",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "目标标题，最多100字"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "目标说明，最多500字"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "开始日期，格式YYYY-MM-DD"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "截止日期，格式YYYY-MM-DD"
+                    }
+                },
+                "required": ["title"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_task",
+            "description": "为当前用户创建学习任务，可关联到当前用户自己的目标",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "任务内容，最多255字"
+                    },
+                    "goal_id": {
+                        "type": "integer",
+                        "description": "所属目标ID，可选"
+                    },
+                    "priority": {
+                        "type": "string",
+                        "description": "优先级：高、中、低",
+                        "enum": ["高", "中", "低"]
+                    },
+                    "deadline": {
+                        "type": "string",
+                        "description": "截止时间，格式YYYY-MM-DD HH:mm:ss，可选"
+                    }
+                },
+                "required": ["content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_goals",
+            "description": "查询当前用户的目标列表",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_knowledge_base",
+            "description": "检索当前用户上传的个人知识库，回答基于文档的问题",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "需要基于知识库回答的问题"
+                    }
+                },
+                "required": ["question"]
+            }
+        }
     }
 ]
 
@@ -60,6 +158,7 @@ SYSTEM_PROMPT = """# 角色定位
 3. 学习规划生成：将学习目标拆解为每日执行计划，设置里程碑，给出可落地的学习安排
 4. 跨场景多轮交互：支持连续对话、跨场景追问，基于上下文连贯响应
 5. 混合意图处理：支持用户同时提出多个需求，按逻辑顺序依次处理
+6. 知识库问答：遇到需要依据用户上传文档回答的问题时，调用 search_knowledge_base 工具
 
 # 意图判定与执行规则
 ## 1. 任务完成汇报意图
@@ -80,8 +179,16 @@ SYSTEM_PROMPT = """# 角色定位
 - 判定特征：用户要求「计划/规划/拆解/安排/每天学什么/怎么学/制定学习方案」
 - 执行流程：
   ① 明确用户的学习目标、周期、每日时长、侧重方向等约束条件
-  ② 按照循序渐进、依赖优先、工作量均衡、学练结合、里程碑五大原则拆解任务
-  ③ 输出结构化学习规划，严格遵循五大模块结构
+  ② 先调用 create_goal 创建总目标
+  ③ 再调用 create_task 逐项创建阶段任务或每日任务，并关联刚创建的目标ID
+  ④ 输出结构化学习规划，严格遵循五大模块结构
+
+## 4. 知识库问答意图
+- 判定特征：用户要求根据上传文档、资料、知识库回答，或问题明显依赖个人资料
+- 执行流程：
+  ① 调用 search_knowledge_base 工具，参数为用户的原始问题
+  ② 只依据工具返回的回答和来源进行总结
+  ③ 如果知识库未命中，明确告知用户需要先上传相关资料
 
 # 分场景输出规范
 ## 任务完成评价输出规范
@@ -177,19 +284,21 @@ class AgentService:
         return True, None
 
     def _execute_tool(self, tool_name: str, arguments: dict, user_id: int) -> str:
-        """工具执行器，复用已验证的原生SQL方案"""
+        """执行 Agent 工具，所有数据库条件都强制绑定当前登录用户。"""
         db = next(get_db())
         try:
             if tool_name == "update_task_status":
                 task_id = arguments.get("task_id")
                 is_completed = arguments.get("is_completed")
                 sql = "UPDATE tasks SET is_completed = :is_completed WHERE id = :task_id AND user_id = :user_id"
-                db.execute(text(sql), {
+                result = db.execute(text(sql), {
                     "is_completed": is_completed,
                     "task_id": task_id,
                     "user_id": user_id
                 })
                 db.commit()
+                if result.rowcount == 0:
+                    return f"错误：任务{task_id}不存在或不属于当前用户，未更新"
                 status_text = "已完成" if is_completed else "待完成"
                 return f"任务{task_id}状态更新成功，当前状态：{status_text}"
 
@@ -204,14 +313,99 @@ class AgentService:
                 result = []
                 for task in tasks:
                     status_text = "已完成" if task.is_completed else "待完成"
+                    deadline_text = (
+                        task.deadline.strftime("%Y-%m-%d %H:%M:%S")
+                        if task.deadline else "无"
+                    )
                     result.append(
-                        f"ID:{task.id} | 内容：{task.content} | 优先级：{task.priority} | 状态：{status_text}"
+                        f"ID:{task.id} | 内容：{task.content} | 优先级：{task.priority} | "
+                        f"状态：{status_text} | 截止时间：{deadline_text} | 目标ID：{task.goal_id or '无'}"
                     )
                 return "\n".join(result) if result else "当前暂无任务"
+
+            elif tool_name == "create_goal":
+                goal_in = GoalCreate(**arguments)
+                goal = goal_service.create_goal(db, goal_in, user_id)
+                return (
+                    f"目标创建成功，ID:{goal.id} | 标题：{goal.title} | "
+                    f"状态：{goal.status}"
+                )
+
+            elif tool_name == "create_task":
+                task_arguments = dict(arguments)
+                task_arguments["deadline"] = self._parse_deadline(
+                    task_arguments.get("deadline")
+                )
+                task_in = TaskCreate(**task_arguments)
+                task = task_service.create_task(db, task_in, user_id)
+                return (
+                    f"任务创建成功，ID:{task.id} | 内容：{task.content} | "
+                    f"优先级：{task.priority} | 目标ID：{task.goal_id or '无'}"
+                )
+
+            elif tool_name == "list_goals":
+                goals = goal_service.get_goal_list(db, user_id)
+                result = []
+                for goal in goals:
+                    result.append(
+                        f"ID:{goal.id} | 标题：{goal.title} | 状态：{goal.status} | "
+                        f"截止日期：{goal.end_date or '无'}"
+                    )
+                return "\n".join(result) if result else "当前暂无目标"
+
+            elif tool_name == "search_knowledge_base":
+                question = str(arguments.get("question", "")).strip()
+                if not question:
+                    return "错误：知识库检索问题不能为空"
+                rag_result = rag_service.normal_rag_qa(
+                    question=question,
+                    user_id=user_id,
+                    top_n=5
+                )
+                sources = rag_result.get("sources", [])
+                source_text = "、".join(
+                    str(item.get("document_id"))
+                    for item in sources
+                    if item.get("document_id") is not None
+                ) or "无"
+                return (
+                    f"知识库回答：{rag_result.get('answer', '')}\n"
+                    f"来源文档ID：{source_text}"
+                )
             else:
                 return f"错误：未找到工具 {tool_name}"
+        except HTTPException as e:
+            logger.warning(
+                "[Agent工具] 参数校验或权限失败，tool=%s, error=%s",
+                tool_name,
+                e.detail
+            )
+            return f"错误：{e.detail}"
+        except Exception as e:
+            logger.error(
+                "[Agent工具] 执行失败，tool=%s, error=%s",
+                tool_name,
+                str(e),
+                exc_info=True
+            )
+            return f"错误：工具 {tool_name} 执行失败，请检查输入后重试"
         finally:
             db.close()
+
+    @staticmethod
+    def _parse_deadline(value):
+        """兼容模型可能返回的日期、日期时间或空字符串。"""
+        if value in (None, ""):
+            return None
+        if isinstance(value, datetime):
+            return value
+        text_value = str(value).strip()
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(text_value, fmt)
+            except ValueError:
+                continue
+        return value
 
     def _detect_intent(self, reply: str) -> str:
         """简易意图识别，基于回复内容特征判断"""

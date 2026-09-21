@@ -1,6 +1,6 @@
 # 小童 AI Agent 智能学习助手
 
-这是一个基于 FastAPI 的个人学习助手项目，已完成 9 月 19 日企业级 MVP 验收基线：RBAC 权限、MySQL/ChromaDB/Agent 三层数据隔离、问答日志、管理员基础接口、双存储一致性修复，以及可重复执行的权限和主链路冒烟测试。
+这是一个基于 FastAPI 的个人学习助手项目，已完成 9 月 19 日企业级 MVP 验收基线：RBAC 权限、MySQL/ChromaDB/Agent 三层数据隔离、问答日志、管理员基础接口、双存储一致性修复，以及可重复执行的权限和主链路冒烟测试。正式 Agent 已支持目标创建、任务创建、任务状态更新、目标/任务查询和个人知识库检索。
 
 ## 核心能力
 
@@ -9,6 +9,8 @@
 - 上传 PDF/DOCX，解析文本、切分分块并写入 ChromaDB 向量库。
 - 基于个人知识库的普通 RAG 问答和 SSE 流式问答。
 - 基于 DeepSeek Function Calling 的 Agent 对话与 Redis 多轮会话。
+- Agent 可创建目标和任务、查询进度、更新任务状态，并调用个人 RAG 知识库回答资料问题。
+- 前端支持“知识库问答 / 学习管家”双模式。
 - `user/admin` 双角色权限控制。
 - 管理员分页查询用户、全局文档和问答日志。
 - 问答日志脱敏、耗时记录、知识命中状态和失败信息记录。
@@ -60,7 +62,7 @@ fastapi-demo/
 - Redis 已启动，默认地址为 `127.0.0.1:6379`。
 - 已准备 DeepSeek API Key 和硅基流动 API Key。
 
-当前版本仍使用开发环境默认配置：MySQL 数据库为 `ai_agent_db`，JWT 密钥、数据库地址和 Redis 地址将在 9 月 20 日的配置治理任务中迁移到环境变量。
+当前版本已支持从环境变量读取 DeepSeek 地址、模型、超时和重试次数。MySQL 数据库地址、JWT 密钥和 Redis 地址仍使用开发环境默认配置，将在 9 月 20 日的配置治理任务中继续迁移。
 
 ### 2. 安装依赖
 
@@ -79,6 +81,10 @@ Copy-Item .env.example .env
 
 ```dotenv
 DEEPSEEK_API_KEY=你的DeepSeek密钥
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-v4-flash
+LLM_TIMEOUT_SECONDS=60
+LLM_MAX_RETRIES=2
 SILICONFLOW_API_KEY=你的硅基流动密钥
 SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
 ```
@@ -142,6 +148,8 @@ UPDATE users SET role = 'admin' WHERE username = '你的用户名';
 
 - 至少 10 条权限测试，包含 `401`、`403`、`200` 和跨用户访问。
 - 注册、登录、目标、任务、文档、RAG、Agent 主链路。
+- Agent 目标/任务工具、RAG 工具和跨用户数据隔离。
+- 前端学习管家入口。
 - 空参数、无 Token、错误角色、跨用户、日志写入失败、上传失败回滚。
 
 ## 主要接口
@@ -166,6 +174,8 @@ UPDATE users SET role = 'admin' WHERE username = '你的用户名';
 
 - 权限测试不少于 10 条。
 - 双角色全流程和跨用户访问均有自动化测试。
+- 正式 Agent 已接入目标、任务、进度和知识库工具。
+- 前端已支持学习管家模式。
 - 无 Token、错误角色、空参数、日志失败和上传失败均有回归覆盖。
 - `README.md`、`.env.example` 和 `requirements.txt` 已补齐。
 - 文档上传回滚、删除一致性和敏感字段治理已纳入测试。
@@ -174,6 +184,6 @@ UPDATE users SET role = 'admin' WHERE username = '你的用户名';
 
 ## 注意事项
 
-- 根目录的 `test_*.py` 是历史原型和调试脚本，不属于正式测试集；正式测试由 `pytest.ini` 限定在 `tests/`。
+- 根目录历史原型和调试脚本已移动到桌面归档目录；正式测试由 `pytest.ini` 限定在 `tests/`。
 - 当前 `.env` 可能包含真实密钥，必须保持被 `.gitignore` 忽略。
 - 运行历史原型脚本可能真实创建目标、任务和向量数据，建议只使用测试数据库或确认数据后可回滚的环境。

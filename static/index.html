@@ -148,6 +148,28 @@
             display: flex;
             flex-direction: column;
         }
+        .chat-mode-bar {
+            padding: 10px 15px;
+            border-bottom: 1px solid #ebeef5;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #666;
+            font-size: 13px;
+        }
+        .chat-mode-select {
+            padding: 5px 8px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            background: white;
+            color: #333;
+            outline: none;
+        }
+        .agent-session-status {
+            margin-left: auto;
+            color: #999;
+            font-size: 12px;
+        }
         .chat-messages {
             flex: 1;
             padding: 20px;
@@ -356,6 +378,14 @@
         </div>
         <!-- 右侧：对话聊天区 -->
         <div class="chat-panel">
+            <div class="chat-mode-bar">
+                <label for="chatMode">对话模式</label>
+                <select class="chat-mode-select" id="chatMode">
+                    <option value="rag">知识库问答</option>
+                    <option value="agent">学习管家</option>
+                </select>
+                <span class="agent-session-status" id="agentSessionStatus"></span>
+            </div>
             <div class="chat-messages" id="chatMessages">
                 <div class="message ai">你好！请先上传文档，然后就可以向我提问了。</div>
             </div>
@@ -392,6 +422,8 @@
         let AUTH_TOKEN = sessionStorage.getItem('auth_token') || '';
         // 当前选中的文档ID， null 表示检索全部文档
         let selectedDocId = null;
+        // Agent 会话ID，只保存当前登录用户最近一次会话
+        let agentSessionId = sessionStorage.getItem('agent_session_id') || null;
         // 管理员分页变量
         let currentAdminTab = 'users';
         let adminPage = 1;
@@ -406,6 +438,8 @@
         const adminPanel = document.getElementById('adminPanel');
         const prevPageBtn = document.getElementById('prevPage');
         const nextPageBtn = document.getElementById('nextPage');
+        const chatModeSelect = document.getElementById('chatMode');
+        const agentSessionStatus = document.getElementById('agentSessionStatus');
 
         function setAuthStatus(message, isError = false) {
             authStatus.textContent = message;
@@ -435,6 +469,16 @@
                 '"': '&quot;',
                 "'": '&#39;'
             }[char]));
+        }
+
+        function updateChatModeUi() {
+            if (chatModeSelect.value === 'agent') {
+                questionInput.placeholder = '例如：帮我制定一周 FastAPI 学习计划';
+                agentSessionStatus.textContent = agentSessionId ? '连续会话已启用' : '将创建新会话';
+            } else {
+                questionInput.placeholder = '请输入你的问题...';
+                agentSessionStatus.textContent = '';
+            }
         }
 
         // ==================== 原有功能代码 ====================
@@ -605,6 +649,10 @@
                 setAuthStatus('请先填入 Token', true);
                 return;
             }
+            if (chatModeSelect.value === 'agent') {
+                await sendAgentQuestion(question);
+                return;
+            }
             // 添加用户消息
             addMessage(question, 'user');
             questionInput.value = '';
@@ -693,8 +741,59 @@
                 sendBtn.textContent = '发送';
             }
         }
+        // 发送 Agent 学习管家消息
+        async function sendAgentQuestion(question) {
+            addMessage(question, 'user');
+            questionInput.value = '';
+            sendBtn.disabled = true;
+            sendBtn.textContent = '处理中...';
+            const aiMessageDiv = document.createElement('div');
+            aiMessageDiv.className = 'message ai';
+            aiMessageDiv.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div>';
+            chatMessages.appendChild(aiMessageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            try {
+                const response = await authFetch('/api/v1/agent/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        session_id: agentSessionId,
+                        message: question
+                    })
+                });
+                const result = await response.json();
+                if (response.ok && result.data) {
+                    agentSessionId = result.data.session_id;
+                    sessionStorage.setItem('agent_session_id', agentSessionId);
+                    aiMessageDiv.textContent = result.data.reply;
+                    updateChatModeUi();
+                    saveChatHistory();
+                } else {
+                    aiMessageDiv.textContent = '请求失败：' + (result.message || response.statusText);
+                    saveChatHistory();
+                }
+            } catch (error) {
+                aiMessageDiv.textContent = '请求异常：' + error.message;
+                saveChatHistory();
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = '发送';
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        }
         // 绑定点击和回车发送
         sendBtn.addEventListener('click', sendQuestion);
+        chatModeSelect.addEventListener('change', () => {
+            updateChatModeUi();
+            addMessage(
+                chatModeSelect.value === 'agent'
+                    ? '已切换到学习管家，可以管理目标、任务、进度和知识库问答。'
+                    : '已切换到知识库问答，将基于已上传文档回答。',
+                'ai'
+            );
+        });
         questionInput.addEventListener('keydown', (e) => {
             // Enter 发送消息（不按Ctrl时）
             if (e.key === 'Enter' && !e.ctrlKey) {
@@ -757,6 +856,8 @@
                 AUTH_TOKEN = '';
                 sessionStorage.removeItem('auth_token');
                 sessionStorage.removeItem('role');
+                sessionStorage.removeItem('agent_session_id');
+                agentSessionId = null;
                 selectedDocId = null;
                 adminEntry.style.display = 'none';
                 adminPanel.style.display = 'none';
@@ -768,7 +869,10 @@
 
             AUTH_TOKEN = token;
             sessionStorage.setItem('auth_token', token);
+            agentSessionId = null;
+            sessionStorage.removeItem('agent_session_id');
             setAuthStatus('正在校验 Token...');
+            updateChatModeUi();
             await initializeAuthorizedPage();
         }
 
@@ -896,6 +1000,7 @@
         // 页面加载完毕执行
         window.onload = async function(){
             authTokenInput.value = AUTH_TOKEN;
+            updateChatModeUi();
             loadChatHistory();
             if (AUTH_TOKEN) {
                 await initializeAuthorizedPage();

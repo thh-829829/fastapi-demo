@@ -14,11 +14,13 @@ class LLMClient:
 
     def __init__(self):
         self.api_key = os.getenv("DEEPSEEK_API_KEY")
-        self.base_url = "https://api.deepseek.com"
+        self.base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
         # 硅基流动 Embedding 配置
         self.embedding_api_key = os.getenv("SILICONFLOW_API_KEY")
         self.embedding_base_url = os.getenv("SILICONFLOW_BASE_URL")
-        self.model = "deepseek-v4-flash"
+        self.model = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
+        self.request_timeout_seconds = int(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
+        self.max_retries = int(os.getenv("LLM_MAX_RETRIES", "2"))
         self._client = None
 
     def _get_client(self) -> OpenAI:
@@ -30,7 +32,9 @@ class LLMClient:
             logger.info("初始化DeepSeek大模型客户端")
             self._client = OpenAI(
                 api_key=self.api_key,
-                base_url=self.base_url
+                base_url=self.base_url,
+                timeout=self.request_timeout_seconds,
+                max_retries=self.max_retries
             )
         return self._client
 
@@ -175,7 +179,12 @@ class LLMClient:
         }
         try:
             logger.info(f"[Embedding]发起向量化，文本数量：{len(texts)}，model={model}")
-            response = requests.post(url, headers=headers, json=payload)
+            response = requests.post(
+                url,
+                headers=headers,
+                json=payload,
+                timeout=self.request_timeout_seconds
+            )
             response.raise_for_status()
             data = response.json()
             # 按index 排序，保证返回顺序与输入文本严格一致

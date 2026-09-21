@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, Query, Path, Depends
 from app.schemas.agent_schema import (
     AgentChatRequest,
@@ -11,6 +13,8 @@ from app.services.agent_service import agent_service
 from app.core.deps import get_current_user
 from app.models.user import User
 
+
+logger = logging.getLogger("agent-api")
 
 router = APIRouter(tags=["智能学习管家"])
 
@@ -48,9 +52,10 @@ def agent_chat(
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
+        logger.error("[Agent接口] 对话失败：%s", str(e), exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"服务内部错误：{str(e)}"
+            detail="服务内部错误，请稍后重试"
         )
 
 
@@ -70,9 +75,10 @@ def get_user_sessions(current_user: User = Depends(get_current_user)):
             )
         )
     except Exception as e:
+        logger.error("[Agent接口] 会话列表失败：%s", str(e), exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"服务内部错误：{str(e)}"
+            detail="服务内部错误，请稍后重试"
         )
 
 @router.get("/sessions/{session_id}", response_model=SessionHistoryResponse, summary="获取会话详细历史")
@@ -97,9 +103,10 @@ def get_session_detail(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("[Agent接口] 会话历史失败：%s", str(e), exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"服务内部错误：{str(e)}"
+            detail="服务内部错误，请稍后重试"
         )
 
 @router.delete("/sessions/{session_id}", response_model=SessionListResponse, summary="删除指定会话")
@@ -128,7 +135,8 @@ def delete_session(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("[Agent接口] 删除会话失败：%s", str(e), exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"服务内部错误：{str(e)}"
+            detail="服务内部错误，请稍后重试"
         )

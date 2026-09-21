@@ -1,27 +1,120 @@
-你的项目根目录/
-├── app/                  # 应用主包
-│   ├── __init__.py       # 空文件，标识Python包
-│   ├── main.py           # 程序总入口
-│   ├── api/              # 接口层：存放所有路由接口
-│   │   ├── __init__.py
-│   │   └── v1/           # 接口版本，方便后续迭代
-│   │       ├── __init__.py
-│   │       └── user.py
-│   ├── core/             # 核心层：配置、安全工具
-│   │   ├── __init__.py
-│   │   ├── config.py
-│   │   └── security.py
-│   ├── db/               # 数据库层：连接与会话
-│   │   ├── __init__.py
-│   │   └── database.py
-│   ├── models/           # 模型层：SQLAlchemy ORM模型
-│   │   ├── __init__.py
-│   │   └── user.py
-│   ├── schemas/          # Schema层：Pydantic输入输出模型
-│   │   ├── __init__.py
-│   │   └── user.py
-│   └── services/         # 业务层：CRUD与业务逻辑
-│       ├── __init__.py
-│       └── user_service.py
-├── requirements.txt      # 依赖清单
-└── .gitignore
+项目目录说明
+
+项目名称：小童 AI Agent 智能学习助手
+文档更新：2026-09-21
+Git 基线：ff119df（9 月 19 日企业级 MVP，tag：enterprise-mvp）
+
+一、正式项目结构
+
+fastapi-demo/
+├── alembic/                          # 数据库迁移
+│   ├── versions/
+│   │   └── a632c3abf6a8_add_user_role_and_qa_logs_table.py
+│   ├── env.py
+│   └── script.py.mako
+├── app/                              # FastAPI 应用主包
+│   ├── api/                          # 路由层
+│   │   ├── rag.py                    # 普通 RAG、SSE 流式 RAG
+│   │   └── v1/
+│   │       ├── user.py               # 注册、登录、当前用户
+│   │       ├── goal.py               # 目标 CRUD
+│   │       ├── task.py               # 任务 CRUD
+│   │       ├── file.py               # 文档上传、列表、删除
+│   │       ├── agent.py              # Agent 对话与会话管理
+│   │       └── admin.py              # 管理员用户、文档、日志接口
+│   ├── core/                         # 核心基础设施
+│   │   ├── security.py               # JWT、密码哈希、当前用户、管理员依赖
+│   │   ├── deps.py                   # OAuth2 与当前用户依赖
+│   │   ├── response.py               # 统一响应结构
+│   │   ├── exception.py              # 全局异常处理
+│   │   ├── logger.py                 # 日志初始化
+│   │   └── config.py                 # 配置占位，9 月 20 日接入环境变量
+│   ├── db/
+│   │   └── database.py               # MySQL engine、SessionLocal、get_db
+│   ├── models/                       # SQLAlchemy ORM
+│   │   ├── user.py                   # users，含 role
+│   │   ├── goal.py                   # goals
+│   │   ├── task.py                   # tasks
+│   │   ├── document.py               # documents
+│   │   └── qa_log.py                 # qa_logs
+│   ├── schemas/                      # Pydantic 请求和响应
+│   │   ├── common.py
+│   │   ├── user.py
+│   │   ├── goal.py
+│   │   ├── task.py
+│   │   └── agent_schema.py
+│   ├── services/                     # 业务服务层
+│   │   ├── user_service.py
+│   │   ├── goal_service.py
+│   │   ├── task_service.py
+│   │   ├── document_parser.py        # PDF、DOCX 解析
+│   │   ├── document_service.py
+│   │   ├── rag_service.py            # RAG 检索、回答、缓存、日志
+│   │   ├── qa_log_service.py         # 日志写入、脱敏、管理员查询
+│   │   ├── admin_service.py          # 管理员用户和文档分页查询
+│   │   └── agent_service.py          # Agent 对话、工具调用、会话管理
+│   ├── utils/                        # 外部能力封装
+│   │   ├── llm_client.py             # DeepSeek 与 Embedding
+│   │   ├── vector_store.py           # ChromaDB
+│   │   ├── redis_client.py           # Redis
+│   │   ├── agent_context.py          # Agent 多轮上下文
+│   │   ├── text_splitter.py          # 文本分块
+│   │   └── prompt_templates.py       # RAG 提示词
+│   └── main.py                       # FastAPI 应用入口
+├── docs/
+│   ├── 权限矩阵.md                    # RBAC v1 权限边界
+│   └── 9月19日验收记录.md             # 企业级 MVP 验收记录
+├── static/
+│   ├── index.html                    # RAG 演示前端、Token、管理员入口
+│   └── test.html                     # 静态页连通性测试
+├── tests/                            # 正式 pytest 测试集
+│   ├── conftest.py                   # SQLite 隔离数据库与公共夹具
+│   ├── test_permissions.py           # 16 条权限与跨用户测试
+│   ├── test_main_flows.py            # 6 条主链路冒烟测试
+│   ├── test_failure_handling.py      # 4 条异常与失败降级测试
+│   └── test_agent_tools.py           # 4 条 Agent 工具与隔离测试
+├── .env.example                      # 环境变量模板
+├── .gitignore                        # Git 忽略规则
+├── README.md                         # 启动、接口、权限、日志和测试说明
+├── requirements.txt                  # 运行和测试依赖
+├── pytest.ini                        # 只收集 tests/
+├── alembic.ini                       # Alembic 配置
+├── RAG效果调优报告.md                 # RAG 调参记录
+├── 项目架构说明.md                    # 项目整体架构与演进说明
+└── 目录.txt                          # 本文件
+
+二、本地运行目录
+
+以下目录用于本机运行或调试，不属于 9 月 19 日交付清单，不应和正式代码一起提交：
+
+├── venv/                             # Python 虚拟环境
+├── .env                              # 本地真实密钥
+├── data/chroma_db/                   # ChromaDB 运行数据
+├── app/data/chroma_db/               # 早期运行数据
+├── uploads/                          # 本地上传文件
+└── __pycache__/                      # Python 缓存
+
+三、历史原型和调试脚本
+
+根目录原有 47 个 test_*.py、check_*.py、query_test.py、list_uploads.py
+历史脚本，已经移动到：
+C:\Users\童海红\Desktop\小童的项目\su7\代码
+
+这些脚本不再位于正式项目中，也不会被 pytest 收集。正式回归应以 tests/ 为准。
+test.docx、test.pdf、empty_test.docx 仍作为本地测试样本保留。
+
+四、已移除的旧结构
+
+old_data/security.py 已被 app/core/security.py 取代，当前已从工作区移除，
+删除操作位于 Git 暂存区；下一次提交后，旧 old_data 结构将不再存在于仓库。
+
+五、当前进度
+
+1. 9 月 14 日至 9 月 19 日的企业级 MVP 已完成并提交到 GitHub。
+2. GitHub main 基线为 ff119df，并已创建 enterprise-mvp tag。
+3. 正式测试共 30 条，覆盖权限、数据隔离、四条主链路、Agent 工具和异常降级。
+4. Agent 已补齐目标、任务、进度和 RAG 知识库工具，前端支持学习管家模式。
+5. 根目录历史 Python 脚本已全部移到桌面归档目录，项目根目录不再保留历史脚本。
+6. 本地已补建 `rag-mvp` tag，用于标记 RAG 阶段完成点。
+7. 下一步进入 9 月 20 日：统一配置、清理硬编码、模型配置化、合并重复鉴权、
+   统一路由入口，并准备 Docker 部署。

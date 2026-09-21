@@ -3,7 +3,6 @@ from typing import Optional, List
 
 # ========== 对话接口模型 ==========
 class AgentChatRequest(BaseModel):
-    user_id: int = Field(..., ge=1, description="用户ID")
     session_id: Optional[str] = Field(None, max_length=64, description="会话ID，不传则自动生成")
     message: str = Field(..., min_length=1, max_length=2000, description="用户输入消息")
 
