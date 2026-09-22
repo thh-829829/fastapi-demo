@@ -23,6 +23,7 @@ fastapi-demo/
 │   │       ├── agent.py              # Agent 对话与会话管理
 │   │       └── admin.py              # 管理员用户、文档、日志接口
 │   ├── core/                         # 核心基础设施
+│   │   ├── config.py                 # 统一环境变量和服务配置
 │   │   ├── security.py               # JWT、密码哈希、当前用户、管理员依赖
 │   │   ├── deps.py                   # OAuth2 与当前用户依赖
 │   │   ├── response.py               # 统一响应结构
@@ -72,7 +73,9 @@ fastapi-demo/
 │   ├── test_permissions.py           # 16 条权限与跨用户测试
 │   ├── test_main_flows.py            # 6 条主链路冒烟测试
 │   ├── test_failure_handling.py      # 4 条异常与失败降级测试
-│   └── test_agent_tools.py           # 4 条 Agent 工具与隔离测试
+│   ├── test_agent_tools.py           # 4 条 Agent 工具与隔离测试
+│   ├── test_smoke.py                 # 4 条登录、上传、问答、Agent 冒烟测试
+│   └── test_config.py                # 3 条配置治理测试
 ├── .env.example                      # 环境变量模板
 ├── .gitignore                        # Git 忽略规则
 ├── README.md                         # 启动、接口、权限、日志和测试说明
@@ -112,9 +115,9 @@ old_data/security.py 已被 app/core/security.py 取代，当前已从工作区�
 
 1. 9 月 14 日至 9 月 19 日的企业级 MVP 已完成并提交到 GitHub。
 2. GitHub main 基线为 ff119df，并已创建 enterprise-mvp tag。
-3. 正式测试共 30 条，覆盖权限、数据隔离、四条主链路、Agent 工具和异常降级。
+3. 正式测试共 37 条，覆盖权限、数据隔离、四条主链路、Agent 工具、配置治理和异常降级。
 4. Agent 已补齐目标、任务、进度和 RAG 知识库工具，前端支持学习管家模式。
 5. 根目录历史 Python 脚本已全部移到桌面归档目录，项目根目录不再保留历史脚本。
 6. 本地已补建 `rag-mvp` tag，用于标记 RAG 阶段完成点。
-7. 下一步进入 9 月 20 日：统一配置、清理硬编码、模型配置化、合并重复鉴权、
-   统一路由入口，并准备 Docker 部署。
+7. 9 月 20 日配置治理、环境模板、冒烟测试和企业级 tag 已完成。
+8. 下一步进入 9 月 21 日 Dockerfile 和容器化准备。

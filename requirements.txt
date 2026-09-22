@@ -5,6 +5,7 @@ python-multipart==0.0.32
 
 # 数据校验
 pydantic==2.13.4
+pydantic-settings==2.15.0
 email-validator==2.3.0
 
 # 数据库与迁移

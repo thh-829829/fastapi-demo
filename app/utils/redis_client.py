@@ -2,6 +2,8 @@ import logging
 import redis
 from typing import Optional
 
+from app.core.config import get_settings
+
 logger = logging.getLogger("redis-client")
 
 class RedisClient:
@@ -10,7 +12,7 @@ class RedisClient:
     提供字符串类型的读写、删除、过期设置基础操作
     """
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 6379, db: int = 0):
+    def __init__(self, host: str = None, port: int = None, db: int = None):
         """
         初始化Redis连接参数。
 
@@ -20,9 +22,10 @@ class RedisClient:
         :param port: Redis服务端口
         :param db: 数据库编号
         """
-        self.host = host
-        self.port = port
-        self.db = db
+        settings = get_settings()
+        self.host = host or settings.redis_host
+        self.port = port if port is not None else settings.redis_port
+        self.db = db if db is not None else settings.redis_db
         self._client = None
 
     @property

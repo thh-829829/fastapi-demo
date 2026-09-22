@@ -3,16 +3,19 @@ import logging
 from chromadb.config import Settings
 from chromadb.errors import NotFoundError
 
+from app.core.config import get_settings
+
 logger = logging.getLogger("vector-store")
 
 
 class VectorStore:
-    def __init__(self, persist_dir: str = "./data/chroma_db"):
+    def __init__(self, persist_dir: str = None):
         """
         初始化向量数据库客户端，使用磁盘持久化模式
         :param persist_dir: 向量数据存储路径
         """
         try:
+            persist_dir = persist_dir or get_settings().chromadb_path
             logger.info(f"[向量库初始化] 开始连接，持久化路径：{persist_dir}")
             # 配置持久化目录，重启服务数据不丢失
             self.client = chromadb.PersistentClient(

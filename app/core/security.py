@@ -7,6 +7,10 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.services.user_service import get_user_by_id
 from app.models.user import User
+from app.core.config import get_settings
+
+
+settings = get_settings()
 
 
 # 配置加密上下文，使用bcrypt
@@ -22,13 +26,10 @@ def verify_password(plain_password: str,hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 # ==================JWT配置 ========================
-# 密钥：用户令牌签名，生产环境必须保密，本地开发用随机字符串即可
-# 生成方式：终端执行 python -c "import secrets; print(secrets.token_hex(32))"
-SECRET_KEY = "20616995969b5a50d739da6910b6879375f3b85256928a21aa490ea831c4ae76"
-# 签名算法
-ALGORITHM = "HS256"
-# 令牌默认有效期：30分钟
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# 密钥、算法和有效期统一从环境变量读取。
+SECRET_KEY = settings.jwt_secret_key.get_secret_value()
+ALGORITHM = settings.jwt_algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """

@@ -1,13 +1,18 @@
-from sqlalchemy import create_engine,text
-from sqlalchemy.orm import declarative_base, sessionmaker,Session
-from typing import Generator 
+from typing import Generator
+
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
+
+from app.core.config import get_settings
 
 
-# 数据库连接地址：格式为 数据库类型+驱动：//用户名：密码@地址：端口/数据库名？字符集
-SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:root123456@localhost:3306/ai_agent_db?charset=utf8mb4"
+settings = get_settings()
+
+# 数据库连接地址从环境变量读取，避免在源码中保存账号和密码。
+SQLALCHEMY_DATABASE_URL = settings.database_url
 
 # 创建数据库引擎
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
 
 # 创建会话工厂，用于生成数据库操作会话
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

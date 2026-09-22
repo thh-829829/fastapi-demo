@@ -3,6 +3,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
+from app.core.config import get_settings
 from app.core.response import success
 from app.db.database import get_db
 from app.models.user import User
@@ -22,7 +23,8 @@ logger = logging.getLogger("file-api")
 
 router = APIRouter(prefix="/files", tags=["文件管理"])
 
-UPLOAD_DIR = Path("uploads")
+settings = get_settings()
+UPLOAD_DIR = Path(settings.upload_dir)
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 @router.post("/upload", summary="上传文档并解析存库")

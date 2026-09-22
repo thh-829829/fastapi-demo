@@ -49,8 +49,9 @@ class AgentContextManager:
         :return: 是否成功
         """
         msg = {"role": "user", "content": content}
+        result = self._append_message(msg)
         self._update_session_meta(user_id=user_id)
-        return self._append_message(msg)
+        return result
 
     def add_assistant_message(self, content: Optional[str] = None, tool_calls: Optional[List[Dict]] = None, user_id: int = 1) -> bool:
         """
@@ -63,8 +64,9 @@ class AgentContextManager:
         msg = {"role": "assistant", "content": content}
         if tool_calls:
             msg["tool_calls"] = tool_calls
+        result = self._append_message(msg)
         self._update_session_meta(user_id=user_id)
-        return self._append_message(msg)
+        return result
 
     def add_tool_message(self, tool_call_id: str, name: str, content: str) -> bool:
         """
@@ -182,3 +184,5 @@ class AgentContextManager:
         # 更新最后活跃时间与消息数
         redis_client.hset(info_key, "last_active_at", now)
         redis_client.hset(info_key, "message_count", self.message_count())
+        redis_client.expire(info_key, self.ttl)
+        redis_client.expire(f"user:{user_id}:sessions", self.ttl)

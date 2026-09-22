@@ -2,48 +2,27 @@ from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 
-# 导入用户模块的路由对象
-from app.api.v1.user import router as user_router
-from app.api.v1.goal import router as goal_router
-from app.api.v1.file import router as file_router
-from app.api.v1.task import router as task_router
-from app.api.v1.agent import router as agent_router
-from app.api.v1.admin import router as admin_router
-from app.api.rag import router as rag_router
+from app.api.v1 import api_router
 
 from app.core.exception import http_exception_handler, validation_exception_handler,global_exception_handler
 from app.core.exception import runtime_exception_handler
 from app.core.logger import setup_logger
+from app.core.config import get_settings
 
 # 项目启动立即初始化日志系统
 setup_logger()
 
+settings = get_settings()
+
 # 创建应用实例，标题改为新项目名
-app = FastAPI(title="学习助手API",version="1.0.0")
+app = FastAPI(title=settings.app_name, version=settings.app_version)
 
 # 挂载静态文件目录
 # 将本地 static 文件夹挂载到 /static 路径下。这样用户访问 http://域名/static/图片.jpg 就能直接获取静态文件。
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# 注册用户路由：统一加 /api/v1 前缀
-app.include_router(user_router, prefix="/api/v1")
-
-# 注册goal路由
-app.include_router(goal_router, prefix="/api/v1")
-
-# 注册file路由到主应用
-app.include_router(file_router, prefix="/api/v1")
-
-# 注册task路由
-app.include_router(task_router, prefix="/api/v1")
-
-# 注册问答路由
-app.include_router(rag_router, prefix="/api/v1")
-
-# 注册Agent接口
-app.include_router(agent_router, prefix="/api/v1/agent")
-
-app.include_router(admin_router, prefix="/api/v1")
+# 统一注册 /api/v1 下的业务路由
+app.include_router(api_router)
 
 # 注册全局异常处理器
 app.add_exception_handler(HTTPException, http_exception_handler)

@@ -1,7 +1,6 @@
 # 虚拟环境
 venv/
 .env
-.env.example
 .venv
 env/
 ENV/
@@ -14,5 +13,10 @@ __pycache__/
 *.log
 .idea/
 
-# 本地测试脚本与敏感文件
-# test_*.py
+# 本地运行数据和测试样本
+data/
+app/data/
+uploads/
+test.docx
+test.pdf
+empty_test.docx

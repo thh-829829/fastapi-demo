@@ -4,7 +4,10 @@ from docx import Document
 from io import BytesIO
 from typing import Tuple
 
+from app.core.config import get_settings
+
 logger = logging.getLogger("document-parser")
+settings = get_settings()
 
 
 def parse_pdf_bytes(file_bytes: bytes) -> str:
@@ -81,9 +84,12 @@ def parse_document(file_bytes: bytes, filename: str) -> Tuple[str, str]:
         raise RuntimeError("上传的文件是空的，无法解析")
 
     # 边界校验2：文件大小限制（单文件最大10MB）
-    if len(file_bytes) > 10 * 1024 * 1024:
-        logger.warning(f"[文件校验] 文件超过10MB限制：{filename}，大小：{len(file_bytes)}字节")
-        raise RuntimeError("文件大小超过10MB限制，请上传更小的文档")
+    if len(file_bytes) > settings.max_file_size:
+        max_mb = settings.max_file_size // (1024 * 1024)
+        logger.warning(
+            f"[文件校验] 文件超过{max_mb}MB限制：{filename}，大小：{len(file_bytes)}字节"
+        )
+        raise RuntimeError(f"文件大小超过{max_mb}MB限制，请上传更小的文档")
 
     # 边界校验3：文件名合法性校验
     if "." not in filename:

@@ -1,8 +1,9 @@
-import os
 import requests
 import logging
 from dotenv import load_dotenv
 from openai import OpenAI, APIError, APIConnectionError, AuthenticationError
+
+from app.core.config import get_settings
 
 logger = logging.getLogger("llm-client")
 # 加载环境变量
@@ -13,14 +14,16 @@ class LLMClient:
     """DeepSeek大模型客户端封装"""
 
     def __init__(self):
-        self.api_key = os.getenv("DEEPSEEK_API_KEY")
-        self.base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+        settings = get_settings()
+        self.api_key = settings.deepseek_api_key.get_secret_value()
+        self.base_url = settings.deepseek_base_url
         # 硅基流动 Embedding 配置
-        self.embedding_api_key = os.getenv("SILICONFLOW_API_KEY")
-        self.embedding_base_url = os.getenv("SILICONFLOW_BASE_URL")
-        self.model = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
-        self.request_timeout_seconds = int(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
-        self.max_retries = int(os.getenv("LLM_MAX_RETRIES", "2"))
+        self.embedding_api_key = settings.siliconflow_api_key.get_secret_value()
+        self.embedding_base_url = settings.siliconflow_base_url
+        self.embedding_model = settings.siliconflow_embedding_model
+        self.model = settings.deepseek_model
+        self.request_timeout_seconds = settings.llm_timeout_seconds
+        self.max_retries = settings.llm_max_retries
         self._client = None
 
     def _get_client(self) -> OpenAI:
@@ -161,13 +164,14 @@ class LLMClient:
             raise RuntimeError(f"大模型调用出错：{str(e)}")
 
 
-    def get_embeddings(self, texts: list[str], model: str = "BAAI/bge-large-zh-v1.5") -> list[list[float | int]]:
+    def get_embeddings(self, texts: list[str], model: str = None) -> list[list[float | int]]:
         """
         调用 Embedding接口，批量生成中文文本向量
         :param texts: 待向量化的文本列表，支持批量传入
         :param model: Embedding模型名称，默认使用 BGE 中文大模型
         :return: 向量列表，顺序与输入文本一一对应
         """
+        model = model or self.embedding_model
         url = f"{self.embedding_base_url}/embeddings"
         headers = {
             "Authorization": f"Bearer {self.embedding_api_key}",
