@@ -1,6 +1,6 @@
 # 小童 AI Agent 智能学习助手
 
-这是一个基于 FastAPI 的个人学习助手项目，已完成 9 月 19 日企业级 MVP 验收基线：RBAC 权限、MySQL/ChromaDB/Agent 三层数据隔离、问答日志、管理员基础接口、双存储一致性修复，以及可重复执行的权限和主链路冒烟测试。当前版本对应 Git 标签：`enterprise-mvp`
+这是一个基于 FastAPI 的个人学习助手项目，已完成 9 月 23 日容器化验收基线：RBAC 权限、MySQL/ChromaDB/Agent 三层数据隔离、问答日志、管理员基础接口、双存储一致性修复、可重复执行的权限与主链路测试，以及 Docker Compose 一键启动。当前版本对应 Git 标签：`enterprise-mvp`
 
 ## 核心能力
 
@@ -62,6 +62,8 @@ fastapi-demo/
 
 当前版本的数据库、JWT、Redis、ChromaDB、上传目录、DeepSeek 和硅基流动配置均从 `.env` 读取。新环境复制 `.env.example` 并填写真实值后即可启动。
 
+本地直接运行应用时，`DB_HOST`、`REDIS_HOST` 和 `CHROMA_HOST` 应指向本机服务地址；Docker Compose 会覆盖为容器服务名，不需要手工修改业务代码。
+
 ### 2. 安装依赖
 
 ```powershell
@@ -113,6 +115,38 @@ uvicorn app.main:app --reload
 - 接口文档：`http://127.0.0.1:8000/docs`
 - 演示页面：`http://127.0.0.1:8000/static/index.html`
 
+### 6. Docker Compose 一键启动
+
+已安装 Docker Engine 和 Docker Compose 插件时，可使用容器方式从空数据卷启动：
+
+```powershell
+Copy-Item .env.example .env
+# 填写 DB_PASSWORD、REDIS_PASSWORD、DEEPSEEK_API_KEY 和 SILICONFLOW_API_KEY
+docker compose up -d --build
+docker compose ps
+```
+
+Compose 会自动：
+
+- 启动 FastAPI、MySQL 8、Redis 7 和 ChromaDB。
+- 等待 MySQL、Redis 健康后执行 `alembic upgrade head`。
+- 将容器内数据库、Redis 和 ChromaDB 地址切换为服务名。
+- 将 MySQL、Redis 和 ChromaDB 数据保存到命名数据卷。
+
+启动完成后访问：
+
+- 接口文档：`http://127.0.0.1:8000/docs`
+- 演示页面：`http://127.0.0.1:8000/static/index.html`
+- ChromaDB 宿主机端口：`http://127.0.0.1:8001`
+
+停止容器：
+
+```powershell
+docker compose down
+```
+
+如需从空数据重新验收，可在确认不需要现有数据后执行 `docker compose down -v`，再重新运行 `docker compose up -d --build`。
+
 ## 权限与数据隔离
 
 系统包含 `user` 和 `admin` 两个角色。
@@ -151,7 +185,7 @@ UPDATE users SET role = 'admin' WHERE username = '你的用户名';
 .\venv\Scripts\python.exe -m pytest
 ```
 
-测试使用独立 SQLite 内存数据库模拟 MySQL 请求链路，并替换 LLM、向量库和 Redis 调用，不会污染开发数据库。当前共 37 条测试，覆盖：
+测试使用独立 SQLite 内存数据库模拟 MySQL 请求链路，并替换 LLM、向量库和 Redis 调用，不会污染开发数据库。当前共 41 条测试，覆盖：
 
 - 至少 10 条权限测试，包含 `401`、`403`、`200` 和跨用户访问。
 - 注册、登录、目标、任务、文档、RAG、Agent 主链路。
@@ -189,6 +223,8 @@ UPDATE users SET role = 'admin' WHERE username = '你的用户名';
 完整回归记录见 `docs/9月19日验收记录.md`。
 
 9 月 20 日配置治理和冒烟测试记录见 `docs/9月20日验收记录.md`。
+
+9 月 23 日容器化、迁移和真实服务端到端验收记录见 `docs/9月23日验收记录.md`。
 
 ## 注意事项
 

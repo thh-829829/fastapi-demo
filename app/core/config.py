@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     redis_host: str
     redis_port: int
     redis_db: int
+    redis_password: str = ""
 
     jwt_secret_key: SecretStr
     jwt_algorithm: str
@@ -49,8 +50,12 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int
     llm_max_retries: int
 
-    chromadb_path: str
+    # 原必填字段改为可选，保留默认值兼容本地开发
+    chromadb_path: str = "./data/chroma_db"
     chromadb_collection: str
+    # 新增独立服务配置
+    chroma_host: str = "localhost"
+    chroma_port: int = 8000
 
     upload_dir: str
     max_file_size: int

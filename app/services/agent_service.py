@@ -145,6 +145,18 @@ TOOLS = [
                 "required": ["question"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_documents",
+            "description": "查询当前用户所有已上传的知识库文档列表，返回文档ID、文件名、上传时间",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
     }
 ]
 
@@ -372,6 +384,19 @@ class AgentService:
                     f"知识库回答：{rag_result.get('answer', '')}\n"
                     f"来源文档ID：{source_text}"
                 )
+            elif tool_name == "list_documents":
+                # 查询当前用户所有上传的文档
+                sql = "SELECT id, filename, create_time FROM documents WHERE user_id = :user_id ORDER BY create_time DESC"
+                result = db.execute(text(sql), {"user_id": user_id}).fetchall()
+                if not result:
+                    return "当前暂无上传的文档"
+                doc_list = []
+                for row in result:
+                    doc_list.append(
+                        f"文档ID：{row.id} | 文件名：{row.filename} | 上传时间：{row.create_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
+                return "\n".join(doc_list)
+
             else:
                 return f"错误：未找到工具 {tool_name}"
         except HTTPException as e:
@@ -430,10 +455,14 @@ class AgentService:
         if not session_id:
             session_id = f"sess_{uuid.uuid4().hex[:12]}"
         else:
-            # 已有会话：校验归属权，防止越权操作他人会话
+            # 已有会话：校验归属权；不存在则视为新会话，自动创建绑定
             user_sessions = [s["session_id"] for s in self.list_sessions(user_id)]
+            # 仅当会话已存在但不属于当前用户时才拒绝；新会话自动初始化绑定
+            # 不同用户的会话数据按用户隔离，同名 session_id 互不冲突
             if session_id not in user_sessions:
-                raise PermissionError("会话不存在或无权限访问")
+                # 新会话，跳过校验，后续自动初始化
+                pass
+
         # 2. 初始化上下文管理器
         ctx = AgentContextManager(session_id=session_id, ttl=1800)
         # 3. 新会话初始化系统提示

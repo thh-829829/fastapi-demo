@@ -9,23 +9,39 @@ logger = logging.getLogger("vector-store")
 
 
 class VectorStore:
-    def __init__(self, persist_dir: str = None):
+    def __init__(self, host: str = None, port: int = None):
         """
-        初始化向量数据库客户端，使用磁盘持久化模式
-        :param persist_dir: 向量数据存储路径
+        初始化向量数据库连接参数。
+
+        这里不在导入阶段主动连接ChromaDB，避免测试或仅使用非RAG接口时
+        因为向量服务未启动而阻塞应用导入。第一次执行向量操作时再连接。
+        :param host: ChromaDB服务地址
+        :param port: ChromaDB服务端口
         """
-        try:
-            persist_dir = persist_dir or get_settings().chromadb_path
-            logger.info(f"[向量库初始化] 开始连接，持久化路径：{persist_dir}")
-            # 配置持久化目录，重启服务数据不丢失
-            self.client = chromadb.PersistentClient(
-                path=persist_dir,
-                settings=Settings(anonymized_telemetry=False)
-            )
-            logger.info("[向量库初始化] 连接成功")
-        except Exception as e:
-            logger.error(f"[向量库初始化] 连接失败：{str(e)}", exc_info=True)
-            raise RuntimeError("向量数据库连接失败，请检查服务配置") from e
+        settings = get_settings()
+        # 优先使用传入参数，未传入则读取配置文件
+        self.host = host or settings.chroma_host
+        self.port = port or settings.chroma_port
+        self._client = None
+
+    @property
+    def client(self):
+        """按需创建并返回ChromaDB HTTP客户端。"""
+        if self._client is None:
+            try:
+                logger.info(
+                    f"[向量库初始化] 开始连接，服务地址：{self.host}:{self.port}"
+                )
+                self._client = chromadb.HttpClient(
+                    host=self.host,
+                    port=self.port,
+                    settings=Settings(anonymized_telemetry=False)
+                )
+                logger.info("[向量库初始化] 连接成功")
+            except Exception as e:
+                logger.error(f"[向量库初始化] 连接失败：{str(e)}", exc_info=True)
+                raise RuntimeError("向量数据库连接失败，请检查服务配置") from e
+        return self._client
 
     def get_or_create_collection(self, collection_name: str = "documents"):
         """

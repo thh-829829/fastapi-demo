@@ -26,6 +26,7 @@ class RedisClient:
         self.host = host or settings.redis_host
         self.port = port if port is not None else settings.redis_port
         self.db = db if db is not None else settings.redis_db
+        self.password = settings.redis_password  # 新增：读取Redis密码配置
         self._client = None
 
     @property
@@ -41,6 +42,7 @@ class RedisClient:
                     host=self.host,
                     port=self.port,
                     db=self.db,
+                    password=self.password,  # 新增：传入密码进行认证
                     decode_responses=True,
                     socket_connect_timeout=3
                 )

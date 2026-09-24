@@ -9,6 +9,7 @@ from app.core.exception import runtime_exception_handler
 from app.core.logger import setup_logger
 from app.core.config import get_settings
 
+
 # 项目启动立即初始化日志系统
 setup_logger()
 
@@ -16,6 +17,7 @@ settings = get_settings()
 
 # 创建应用实例，标题改为新项目名
 app = FastAPI(title=settings.app_name, version=settings.app_version)
+
 
 # 挂载静态文件目录
 # 将本地 static 文件夹挂载到 /static 路径下。这样用户访问 http://域名/static/图片.jpg 就能直接获取静态文件。
