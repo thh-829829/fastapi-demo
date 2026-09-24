@@ -1,0 +1,104 @@
+# 命名数据卷：容器重建后数据库、缓存和向量数据仍可保留
+volumes:
+  mysql_data:
+  redis_data:
+  chroma_data:
+
+services:
+  # 1. FastAPI 应用服务
+  fastapi:
+    build: .
+    image: rag-app:v1
+    container_name: rag-app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # 容器内必须通过服务名访问，不能使用本机 localhost
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+    command:
+      - sh
+      - -c
+      - |
+        alembic upgrade head &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+
+  # 2. MySQL 数据库
+  mysql:
+    image: hub.rat.dev/library/mysql:8.0.36
+    container_name: rag-mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  # 3. Redis 缓存与会话记忆
+  redis:
+    image: hub.rat.dev/library/redis:7-alpine
+    container_name: rag-redis
+    ports:
+      - "6379:6379"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli -a "$${REDIS_PASSWORD}" ping | grep PONG
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # 4. ChromaDB 向量数据库
+  chromadb:
+    image: hub.rat.dev/chromadb/chroma:latest
+    container_name: rag-chroma
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "False"
+    restart: unless-stopped

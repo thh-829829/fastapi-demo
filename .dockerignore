@@ -1,0 +1,30 @@
+# Python缓存与虚拟环境
+venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+
+# 环境与配置文件
+.env
+.env.local
+
+# IDE与系统文件
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 文档与测试文件
+*.md
+*.docx
+*.pdf
+test/
+tests/
+empty_test.docx
+test.docx
+test.pdf
+目录.txt
+项目架构说明.md
+RAG效果调优报告.md
+README.md
