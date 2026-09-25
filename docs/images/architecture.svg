@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#546a7b"/>
+    </marker>
+    <style>
+      .title { font: 700 34px "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #24313d; }
+      .subtitle { font: 400 18px "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #607080; }
+      .group-title { font: 700 20px "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #34495e; }
+      .box-title { font: 700 20px "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #1f2d3d; }
+      .box-text { font: 400 15px "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #52606d; }
+      .small { font: 400 14px "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #66788a; }
+      .line { stroke: #546a7b; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #8fa3b5; stroke-width: 2; fill: none; stroke-dasharray: 8 8; }
+      .client { fill: #e8f1ff; stroke: #4d86d9; stroke-width: 2; rx: 14; }
+      .proxy { fill: #fff4e5; stroke: #d89a32; stroke-width: 2; rx: 14; }
+      .app { fill: #e8f7f0; stroke: #2e9d6f; stroke-width: 2; rx: 14; }
+      .data { fill: #f3e8ff; stroke: #8250c7; stroke-width: 2; rx: 14; }
+      .external { fill: #eef2f7; stroke: #6c7f91; stroke-width: 2; rx: 14; }
+      .badge { font: 700 13px "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #ffffff; }
+      .badge-box { rx: 8; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="980" fill="#f7f8fb"/>
+  <text x="80" y="70" class="title">AI Agent 智能学习助手 v1.0.0 架构</text>
+  <text x="80" y="103" class="subtitle">FastAPI + RAG + Agent + RBAC，Docker Compose 单机部署</text>
+
+  <rect x="70" y="150" width="330" height="230" rx="18" fill="#ffffff" stroke="#d9e2ec" stroke-width="2"/>
+  <text x="100" y="185" class="group-title">访问入口</text>
+
+  <rect x="100" y="215" width="270" height="62" class="client"/>
+  <text x="125" y="244" class="box-title">Web 浏览器</text>
+  <text x="125" y="266" class="box-text">PC / 手机端响应式页面</text>
+
+  <rect x="100" y="292" width="270" height="62" class="client"/>
+  <text x="125" y="321" class="box-title">Swagger UI</text>
+  <text x="125" y="343" class="box-text">/docs 与 OpenAPI 接口调试</text>
+
+  <rect x="455" y="198" width="240" height="150" class="proxy"/>
+  <text x="488" y="239" class="box-title">Nginx</text>
+  <text x="488" y="268" class="box-text">HTTP 反向代理</text>
+  <text x="488" y="294" class="box-text">静态资源 / API / SSE</text>
+  <text x="488" y="320" class="box-text">对外端口 80</text>
+
+  <rect x="750" y="130" width="790" height="650" rx="20" fill="#ffffff" stroke="#8fa3b5" stroke-width="2.5" stroke-dasharray="10 8"/>
+  <text x="790" y="170" class="group-title">Docker Compose 运行环境</text>
+
+  <rect x="790" y="205" width="325" height="520" class="app"/>
+  <text x="820" y="245" class="box-title">FastAPI 应用</text>
+  <text x="820" y="275" class="box-text">JWT / RBAC 鉴权与依赖注入</text>
+  <text x="820" y="303" class="box-text">目标、任务、文档 API</text>
+  <text x="820" y="331" class="box-text">RAG 普通问答与 SSE 流式问答</text>
+  <text x="820" y="359" class="box-text">Agent 统一入口与 6 个工具</text>
+  <text x="820" y="387" class="box-text">问答日志、脱敏与异常兜底</text>
+
+  <rect x="820" y="425" width="265" height="70" rx="10" fill="#ffffff" stroke="#69b89a" stroke-width="1.8"/>
+  <text x="842" y="452" class="box-title">API 路由层</text>
+  <text x="842" y="477" class="box-text">统一响应、参数校验、权限依赖</text>
+
+  <rect x="820" y="513" width="265" height="70" rx="10" fill="#ffffff" stroke="#69b89a" stroke-width="1.8"/>
+  <text x="842" y="540" class="box-title">Service 业务层</text>
+  <text x="842" y="565" class="box-text">用户、目标、任务、文档、RAG、Agent</text>
+
+  <rect x="820" y="601" width="265" height="88" rx="10" fill="#ffffff" stroke="#69b89a" stroke-width="1.8"/>
+  <text x="842" y="628" class="box-title">数据访问与工具层</text>
+  <text x="842" y="653" class="box-text">SQLAlchemy / Redis / Chroma</text>
+  <text x="842" y="677" class="box-text">LLM 客户端 / 文档解析 / 文本分块</text>
+
+  <rect x="1180" y="205" width="315" height="150" class="external"/>
+  <text x="1210" y="245" class="box-title">DeepSeek API</text>
+  <text x="1210" y="276" class="box-text">对话生成</text>
+  <text x="1210" y="303" class="box-text">Function Calling</text>
+  <text x="1210" y="330" class="box-text">流式响应与错误重试</text>
+
+  <rect x="1180" y="390" width="315" height="150" class="external"/>
+  <text x="1210" y="430" class="box-title">硅基流动 BGE</text>
+  <text x="1210" y="461" class="box-text">中文 Embedding</text>
+  <text x="1210" y="488" class="box-text">BAAI/bge-large-zh-v1.5</text>
+  <text x="1210" y="515" class="box-text">入库与检索同源模型</text>
+
+  <rect x="1180" y="575" width="315" height="155" class="data"/>
+  <text x="1210" y="615" class="box-title">持久化与缓存</text>
+  <text x="1210" y="646" class="box-text">MySQL：用户、目标、任务、文档、日志</text>
+  <text x="1210" y="674" class="box-text">Redis：热门问答缓存、Agent 会话</text>
+  <text x="1210" y="702" class="box-text">ChromaDB：用户隔离向量分块</text>
+
+  <rect x="455" y="420" width="240" height="290" class="data"/>
+  <text x="488" y="460" class="box-title">核心数据边界</text>
+  <text x="488" y="493" class="box-text">user_id 强制过滤</text>
+  <text x="488" y="522" class="box-text">MySQL 数据隔离</text>
+  <text x="488" y="551" class="box-text">Chroma 元数据隔离</text>
+  <text x="488" y="580" class="box-text">Agent 工具身份隔离</text>
+  <text x="488" y="609" class="box-text">管理员接口 403 兜底</text>
+  <text x="488" y="638" class="box-text">问答日志自动脱敏</text>
+  <text x="488" y="667" class="box-text">资源跨用户返回 404</text>
+
+  <rect x="790" y="830" width="705" height="90" rx="14" fill="#ffffff" stroke="#cfd8e3" stroke-width="2"/>
+  <text x="820" y="865" class="group-title">测试与验收</text>
+  <text x="820" y="894" class="box-text">42 条自动化测试 · 16 条权限测试 · 29 个 API 操作 · 6 个 Agent 工具 · 4 个容器服务</text>
+
+  <path d="M370 246 C405 246 420 246 455 252" class="line"/>
+  <path d="M695 270 C720 270 735 270 790 285" class="line"/>
+  <path d="M1115 450 C1145 450 1150 280 1180 280" class="line"/>
+  <path d="M1115 500 C1145 500 1150 465 1180 465" class="line"/>
+  <path d="M1115 610 C1145 610 1150 650 1180 650" class="line"/>
+
+  <rect x="700" y="245" width="48" height="26" class="badge-box" fill="#2e9d6f"/>
+  <text x="713" y="264" class="badge">API</text>
+  <rect x="1145" y="430" width="48" height="26" class="badge-box" fill="#6c7f91"/>
+  <text x="1158" y="449" class="badge">LLM</text>
+  <rect x="1145" y="620" width="48" height="26" class="badge-box" fill="#8250c7"/>
+  <text x="1158" y="639" class="badge">DATA</text>
+</svg>

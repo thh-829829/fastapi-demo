@@ -222,3 +222,16 @@ def test_frontend_exposes_agent_mode(client):
     assert response.status_code == 200
     assert "学习管家" in response.text
     assert "/api/v1/agent/chat" in response.text
+
+
+def test_frontend_admin_logs_and_mobile_layout(client):
+    """前端应提供问答日志入口，并包含移动端单列布局规则。"""
+    response = client.get("/static/index.html")
+    assert response.status_code == 200
+    assert "no-store" in response.headers["cache-control"]
+    assert 'data-tab="logs"' in response.text
+    assert "问答日志" in response.text
+    assert "/api/v1/admin/qa-logs" in response.text
+    assert "@media (max-width: 900px)" in response.text
+    assert 'data-label="问题"' in response.text
+    assert 'data-label="状态"' in response.text

@@ -20,9 +20,11 @@ def test_compose_uses_container_service_names_and_runs_migrations():
     assert "CHROMA_PORT: 8000" in content
     assert "alembic upgrade head" in content
     assert "condition: service_healthy" in content
+    assert content.count("condition: service_healthy") >= 3
     assert "mysql_data:/var/lib/mysql" in content
     assert "redis_data:/data" in content
     assert "chroma_data:/chroma/chroma" in content
+    assert "/api/v2/heartbeat" in content
 
 
 def test_migration_can_create_a_clean_database():

@@ -6,6 +6,9 @@ env/
 ENV/
 # Python缓存
 __pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
 *.pyc
 # 编辑器、系统文件
 .vscode/

@@ -5,6 +5,13 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Git、IDE与开发文档
+.git/
+.idea/
+docs/
+deploy/
+tests/
+
 # 环境与配置文件
 .env
 .env.local
@@ -27,4 +34,3 @@ test.pdf
 目录.txt
 项目架构说明.md
 RAG效果调优报告.md
-README.md

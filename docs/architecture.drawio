@@ -1,0 +1,67 @@
+<mxfile host="app.diagrams.net" modified="2026-09-25T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ai-agent-architecture" name="v1.0.0 架构">
+    <mxGraphModel dx="1600" dy="980" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="980" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="AI Agent 智能学习助手 v1.0.0 架构" style="text;html=1;fontSize=28;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="60" y="30" width="680" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="client" value="Web 浏览器&#10;PC / 手机端" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F1FF;strokeColor=#4D86D9;" vertex="1" parent="1">
+          <mxGeometry x="80" y="180" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="swagger" value="Swagger UI&#10;/docs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F1FF;strokeColor=#4D86D9;" vertex="1" parent="1">
+          <mxGeometry x="80" y="280" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="nginx" value="Nginx&#10;HTTP 反向代理&#10;静态资源 / API / SSE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF4E5;strokeColor=#D89A32;" vertex="1" parent="1">
+          <mxGeometry x="420" y="205" width="250" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="fastapi" value="FastAPI 应用&#10;&#10;API 路由层&#10;Service 业务层&#10;数据访问与工具层&#10;&#10;JWT / RBAC / RAG / Agent / 日志" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F7F0;strokeColor=#2E9D6F;align=left;spacingLeft=18;" vertex="1" parent="1">
+          <mxGeometry x="760" y="210" width="330" height="480" as="geometry" />
+        </mxCell>
+        <mxCell id="mysql" value="MySQL&#10;用户 / 目标 / 任务 / 文档 / 问答日志" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#8250C7;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="210" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="redis" value="Redis&#10;问答缓存 / Agent 多轮会话" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#8250C7;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="340" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="chroma" value="ChromaDB&#10;用户隔离向量分块" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#8250C7;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="470" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="deepseek" value="DeepSeek API&#10;对话生成 / Function Calling / 流式响应" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF2F7;strokeColor=#6C7F91;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="600" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="silicon" value="硅基流动 BGE&#10;中文 Embedding" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF2F7;strokeColor=#6C7F91;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="730" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="boundary" value="核心数据边界&#10;&#10;MySQL user_id 过滤&#10;Chroma user_id 元数据过滤&#10;Agent 工具绑定 JWT 用户&#10;管理员接口 403 兜底&#10;问答日志脱敏" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#8250C7;align=left;spacingLeft=18;" vertex="1" parent="1">
+          <mxGeometry x="420" y="420" width="250" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="edge1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;" edge="1" parent="1" source="client" target="nginx">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;" edge="1" parent="1" source="swagger" target="nginx">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;" edge="1" parent="1" source="nginx" target="fastapi">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;" edge="1" parent="1" source="fastapi" target="mysql">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;" edge="1" parent="1" source="fastapi" target="redis">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;" edge="1" parent="1" source="fastapi" target="chroma">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;" edge="1" parent="1" source="fastapi" target="deepseek">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;" edge="1" parent="1" source="fastapi" target="silicon">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
